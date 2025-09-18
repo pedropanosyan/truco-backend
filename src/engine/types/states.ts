@@ -1,0 +1,15 @@
+export enum HAND_STATE {
+  START_HAND = 'startHand',
+  READY = 'ready',
+  ENVIDO = 'envido',
+  ENVIDO2 = 'envido2',
+  REAL_ENVIDO = 'realEnvido',
+  FALTA_ENVIDO = 'faltaEnvido',
+  RESOLVING_ENVIDO = 'resolvingEnvido',
+  POST_ENVIDO = 'postEnvido',
+  TRUCO = 'truco',
+  RETRUCO = 'retruco',
+  VALE_CUATRO = 'valeCuatro',
+  PLAYING = 'playing',
+  END_HAND = 'endHand',
+}
