@@ -3,8 +3,7 @@ import { HandActions, HandEvents, HandStates, next } from '.';
 import { EnvidoEvents } from '../envido/';
 import { sendParent } from 'xstate';
 import { GameActions } from '../game';
-
-const toHand = (state: HandStates) => `#hand.${state}` as const;
+import { updateEnvidoPoints } from './rules';
 
 export const handMachine = handSetup.createMachine({
   id: 'hand',
@@ -16,11 +15,9 @@ export const handMachine = handSetup.createMachine({
     cardPlays: [],
     currentTurn: input.startingPlayer,
     startingPlayer: input.startingPlayer,
-    envidoPoints: 0,
     trucoPoints: 0,
     scoreLimit: input.scoreLimit,
     currentScores: input.currentScores,
-    envidoWinnerPlayerId: undefined,
     trucoWinnerPlayerId: undefined,
   }),
 
@@ -66,7 +63,7 @@ export const handMachine = handSetup.createMachine({
             ],
             [HandEvents.FORFEIT]: {
               guard: 'isCurrentTurn',
-              target: toHand(HandStates.HAND_END),
+              target: `#hand.${HandStates.HAND_END}`,
               actions: [HandActions.HANDLE_FORFEIT],
             },
           },
@@ -87,17 +84,28 @@ export const handMachine = handSetup.createMachine({
             [HandEvents.ENVIDO_ACCEPTED]: {
               target: `#hand.${HandStates.TRUCO_PHASE}`,
               actions: [
-                HandActions.UPDATE_ENVIDO_POINTS,
-                sendParent(({ context,  }) => ({
-                  type: GameActions.UPDATE_GAME_POINTS,
-                  points: context.envidoPoints,
-                  playerId: context.currentTurn,
-                })),
+                sendParent(({ context, event }) => {
+                  const result = updateEnvidoPoints(context, event.points);
+                  return {
+                    type: GameActions.UPDATE_GAME_POINTS,
+                    points: result.envidoPoints,
+                    playerId: result.winnerPlayerId,
+                  };
+                }),
               ],
             },
             [HandEvents.ENVIDO_DECLINED]: {
               target: `#hand.${HandStates.TRUCO_PHASE}`,
-              actions: [HandActions.UPDATE_ENVIDO_POINTS],
+              actions: [
+                sendParent(({ context, event }) => {
+                  const result = updateEnvidoPoints(context, event.points);
+                  return {
+                    type: GameActions.UPDATE_GAME_POINTS,
+                    points: result.envidoPoints,
+                    playerId: result.winnerPlayerId,
+                  };
+                }),
+              ],
             },
             [HandEvents.TRUCO_ACCEPTED]: {
               target: HandStates.ENVIDO_PHASE_IDLE,

@@ -15,6 +15,19 @@ export enum Rank {
   TWELVE = 'TWELVE',
 }
 
+export const RANK_ENVIDO_VALUES: Record<Rank, number> = {
+  [Rank.ACE]: 1,
+  [Rank.TWO]: 2,
+  [Rank.THREE]: 3,
+  [Rank.FOUR]: 4,
+  [Rank.FIVE]: 5,
+  [Rank.SIX]: 6,
+  [Rank.SEVEN]: 7,
+  [Rank.TEN]: 0,
+  [Rank.ELEVEN]: 0,
+  [Rank.TWELVE]: 0,
+};
+
 export enum Suit {
   COPA = 'COPA',
   ORO = 'ORO',
@@ -109,11 +122,9 @@ export interface HandContext {
   cardPlays: { playerId: string; card: Card }[];
   currentTurn: string;
   startingPlayer: string;
-  envidoPoints: number;
   trucoPoints: number;
   scoreLimit: number;
   currentScores: Record<Player['id'], number>;
-  envidoWinnerPlayerId: string | undefined;
   trucoWinnerPlayerId: string | undefined;
 }
 

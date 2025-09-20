@@ -1,4 +1,11 @@
-import { HandContext, Card, Rank, Suit } from './types';
+import {
+  HandContext,
+  Card,
+  Rank,
+  Suit,
+  Hand,
+  RANK_ENVIDO_VALUES,
+} from './types';
 
 const isCurrentTurn = (context: HandContext, playerId: string): boolean => {
   return context.currentTurn === playerId;
@@ -57,6 +64,35 @@ const dealCards = (context: HandContext) => {
   });
 };
 
+const getEnvido = (cards: Hand): number => {
+  const bySuit = cards.reduce(
+    (acc, card) => {
+      if (!acc[card.suit]) acc[card.suit] = [];
+      acc[card.suit].push(card);
+      return acc;
+    },
+    {} as Record<Suit, Card[]>,
+  );
+
+  let best = 0;
+
+  for (const suitCards of Object.values(bySuit)) {
+    if (suitCards.length === 0) continue;
+
+    const values = suitCards
+      .map((card) => RANK_ENVIDO_VALUES[card.rank])
+      .sort((a, b) => b - a);
+
+    if (values.length === 1) {
+      best = Math.max(best, values[0]);
+    } else {
+      best = Math.max(best, 20 + values[0] + values[1]);
+    }
+  }
+
+  return best;
+};
+
 const playCard = (context: HandContext, playerId: string, card: Card) => {
   const playerHand = context.hands[playerId];
   const cardIndex = playerHand.findIndex(
@@ -97,8 +133,23 @@ const handleForfeit = (context: HandContext, playerId: string) => {
   // Could involve ending the hand or round
 };
 
-const updateEnvidoPoints = (context: HandContext, points: number) => {
-  context.envidoPoints += points;
+const updateEnvidoPoints = (
+  context: HandContext,
+  points: number,
+): { envidoPoints: number; winnerPlayerId: string } => {
+  const envidoByPlayer = context.players.map((player) => ({
+    playerId: player.id,
+    envido: getEnvido(context.hands[player.id]),
+  }));
+
+  const winner = envidoByPlayer.reduce((best, current) =>
+    current.envido > best.envido ? current : best,
+  );
+
+  return {
+    envidoPoints: points,
+    winnerPlayerId: winner.playerId,
+  };
 };
 
 const updateTrucoPoints = (context: HandContext, points: number) => {
@@ -109,7 +160,6 @@ const resetHand = (context: HandContext) => {
   // Reset the hand for a new game
   context.hands = {};
   context.cardPlays = [];
-  context.envidoPoints = 0;
   context.trucoPoints = 0;
   context.currentTurn = context.startingPlayer;
 };
@@ -119,6 +169,7 @@ export {
   next,
   hasCard,
   dealCards,
+  getEnvido,
   playCard,
   allPlayersPlayedFirstCard,
   shouldCloseEnvido,

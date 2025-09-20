@@ -81,14 +81,7 @@ export const handSetup = setup({
         handleForfeit(context, event.playerId);
       }
     },
-    [HandActions.UPDATE_ENVIDO_POINTS]: ({ context, event }) => {
-      if (
-        event.type === HandEvents.ENVIDO_ACCEPTED ||
-        event.type === HandEvents.ENVIDO_DECLINED
-      ) {
-        updateEnvidoPoints(context, event.points);
-      }
-    },
+
     [HandActions.UPDATE_TRUCO_POINTS]: ({ context, event }) => {
       if (
         event.type === HandEvents.TRUCO_ACCEPTED ||

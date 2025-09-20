@@ -25,7 +25,6 @@ describe('Hand Machine', () => {
       expect(actor.getSnapshot().context.cardPlays).toEqual([]);
       expect(actor.getSnapshot().context.currentTurn).toBe('player1');
       expect(actor.getSnapshot().context.startingPlayer).toBe('player1');
-      expect(actor.getSnapshot().context.envidoPoints).toBe(0);
       expect(actor.getSnapshot().context.trucoPoints).toBe(0);
       expect(actor.getSnapshot().context.scoreLimit).toBe(30);
       expect(actor.getSnapshot().context.currentScores).toEqual({
