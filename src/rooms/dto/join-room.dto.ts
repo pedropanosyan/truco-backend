@@ -6,5 +6,4 @@ export interface JoinRoomDto {
 export interface JoinRoomResponse {
   roomId: string;
   players: string[];
-  status: string;
 }

@@ -5,7 +5,6 @@ import {
   CreateRoomDto,
   CreateRoomResponse,
   DisconnectedResponse,
-  RoomStatus,
   JoinRoomResponse,
   JoinRoomDto,
   LeaveRoomDto,
@@ -31,9 +30,11 @@ export class RoomsService {
   }
 
   public handleConnection(socketId: string): ConnectedResponse {
+    const rooms = this.roomManager.getRooms();
     return {
       message: 'Player connected',
       socketId,
+      rooms,
     };
   }
 
@@ -82,7 +83,6 @@ export class RoomsService {
       owner: playerId,
       players: [playerId],
       maxPlayers: options.maxPlayers,
-      status: RoomStatus.WAITING,
       betAmount: options.betAmount,
     };
 
@@ -123,7 +123,6 @@ export class RoomsService {
     return {
       roomId: data.roomId,
       players: updatedRoom.players,
-      status: RoomStatus.WAITING,
     };
   }
 
@@ -160,10 +159,9 @@ export class RoomsService {
       return {
         roomId: room.id,
         players: updatedRoom.players,
-        status: RoomStatus.WAITING,
       };
     }
   }
 
-  
+
 }

@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { RoomsGateway } from './rooms.gateway';
 import { RoomsService } from '../service/rooms.service';
 import { ServerToClientEvents } from '../types';
-import { CreateRoomDto, JoinRoomDto, LeaveRoomDto, RoomStatus } from '../dto';
+import { CreateRoomDto, JoinRoomDto, LeaveRoomDto } from '../dto';
 import type { Socket, Server } from 'socket.io';
 
 const createMockSocket = (id: string): Partial<Socket> => ({
@@ -49,6 +49,7 @@ describe('RoomsGateway', () => {
         {
           message: 'Player connected',
           socketId: 'test-socket-123',
+          rooms: [],
         },
       );
     });
@@ -93,7 +94,6 @@ describe('RoomsGateway', () => {
           owner: 'player-123',
           players: ['player-123'],
           maxPlayers: 4,
-          status: RoomStatus.WAITING,
           betAmount: 10,
         }),
       );
@@ -110,7 +110,6 @@ describe('RoomsGateway', () => {
         owner: 'owner-123',
         players: ['owner-123'],
         maxPlayers: 4,
-        status: RoomStatus.WAITING,
         betAmount: 10,
       });
 
@@ -132,7 +131,6 @@ describe('RoomsGateway', () => {
         {
           roomId: roomId,
           players: ['owner-123', 'player-123'],
-          status: RoomStatus.WAITING,
         },
       );
     });
@@ -148,7 +146,6 @@ describe('RoomsGateway', () => {
         owner: 'owner-123',
         players: ['owner-123', 'player-123'],
         maxPlayers: 4,
-        status: RoomStatus.WAITING,
         betAmount: 10,
       });
 
@@ -170,7 +167,6 @@ describe('RoomsGateway', () => {
         {
           roomId: roomId,
           players: ['owner-123'],
-          status: RoomStatus.WAITING,
         },
       );
     });
@@ -184,7 +180,6 @@ describe('RoomsGateway', () => {
         owner: 'player-123',
         players: ['player-123'],
         maxPlayers: 4,
-        status: RoomStatus.WAITING,
         betAmount: 10,
       });
 

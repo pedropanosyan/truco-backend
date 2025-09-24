@@ -10,7 +10,6 @@ export interface CreateRoomResponse {
   id: string;
   owner: string;
   players: string[];
-  status: string;
   betAmount: number;
   maxPlayers: number;
 }

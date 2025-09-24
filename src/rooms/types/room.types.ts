@@ -1,12 +1,8 @@
-import { RoomStatus } from '../dto';
-
-
 export interface Room {
   id: string;
   owner: string;
   players: string[];
   maxPlayers: number;
-  status: RoomStatus;
   betAmount: number;
 }
 

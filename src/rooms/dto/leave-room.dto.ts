@@ -6,5 +6,4 @@ export interface LeaveRoomDto {
 export interface LeaveRoomResponse {
   roomId: string;
   players: string[];
-  status: string;
 }

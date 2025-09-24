@@ -9,6 +9,10 @@ export class RoomManager {
     return this.rooms.get(roomId);
   }
 
+  getRooms(): Room[] {
+    return Array.from(this.rooms.values());
+  }
+
   addRoom(room: Room): void {
     this.rooms.set(room.id, room);
   }

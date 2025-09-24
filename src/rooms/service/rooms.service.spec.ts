@@ -4,13 +4,8 @@ import {
   ConnectedResponse,
   DisconnectedResponse,
   CreateRoomDto,
-  CreateRoomResponse,
   JoinRoomDto,
-  JoinRoomResponse,
   LeaveRoomDto,
-  LeaveRoomResponse,
-  DeleteRoomResponse,
-  RoomStatus,
 } from '../dto';
 import {
   PlayerNotFoundException,
@@ -31,7 +26,6 @@ describe('RoomsService', () => {
     service = module.get<RoomsService>(RoomsService);
   });
 
-  // Test Helper Functions
   const getRoomManager = () => (service as any).roomManager;
 
   const clearRoomManager = () => {
@@ -55,7 +49,6 @@ describe('RoomsService', () => {
     owner: 'owner-123',
     players: ['owner-123'],
     maxPlayers: 4,
-    status: RoomStatus.WAITING,
     betAmount: 10,
     ...overrides,
   });
@@ -127,6 +120,7 @@ describe('RoomsService', () => {
       expect(result).toEqual({
         message: 'Player connected',
         socketId: socketId,
+        rooms: [],
       });
     });
   });
@@ -293,7 +287,6 @@ describe('RoomsService', () => {
         owner: playerId,
         players: [playerId],
         maxPlayers: 6,
-        status: RoomStatus.WAITING,
         betAmount: 25,
       });
       expect(result.id).toBeDefined();
@@ -424,7 +417,6 @@ describe('RoomsService', () => {
       expect(result).toEqual({
         roomId,
         players: [ownerId, playerId],
-        status: RoomStatus.WAITING,
       });
 
       const updatedPlayer = roomManager.sockets.get(socketId);
@@ -560,7 +552,6 @@ describe('RoomsService', () => {
       expect(result).toEqual({
         roomId,
         players: [ownerId, otherPlayerId],
-        status: RoomStatus.WAITING,
       });
 
       expect(roomManager.rooms.has(roomId)).toBe(true);
@@ -597,7 +588,6 @@ describe('RoomsService', () => {
       expect(result).toEqual({
         roomId,
         players: [ownerId],
-        status: RoomStatus.WAITING,
       });
 
       expect(roomManager.rooms.has(roomId)).toBe(true);
