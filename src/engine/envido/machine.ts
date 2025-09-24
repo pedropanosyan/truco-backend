@@ -7,6 +7,7 @@ export const envidoMachine = envidoSetup.createMachine({
 
   context: ({ input }) => ({
     pointsOnStake: 0,
+    lastBid: undefined,
     scoreLimit: input.scoreLimit,
     greaterScore: input.greaterScore,
     next: () => input.next(),
@@ -17,15 +18,18 @@ export const envidoMachine = envidoSetup.createMachine({
       on: {
         [EnvidoEvents.CALL_ENVIDO]: {
           target: EnvidoStates.ENVIDO,
-          actions: [EnvidoActions.CALL_ENVIDO],
+          actions: [EnvidoActions.CALL_ENVIDO, EnvidoActions.CHANGE_TURN],
         },
         [EnvidoEvents.RAISE_REAL_ENVIDO]: {
           target: EnvidoStates.REAL_ENVIDO,
-          actions: [EnvidoActions.RAISE_REAL_ENVIDO],
+          actions: [EnvidoActions.RAISE_REAL_ENVIDO, EnvidoActions.CHANGE_TURN],
         },
         [EnvidoEvents.RAISE_FALTA_ENVIDO]: {
           target: EnvidoStates.FALTA_ENVIDO,
-          actions: [EnvidoActions.RAISE_FALTA_ENVIDO],
+          actions: [
+            EnvidoActions.RAISE_FALTA_ENVIDO,
+            EnvidoActions.CHANGE_TURN,
+          ],
         },
       },
     },
@@ -34,15 +38,18 @@ export const envidoMachine = envidoSetup.createMachine({
       on: {
         [EnvidoEvents.CALL_ENVIDO]: {
           target: EnvidoStates.ENVIDO_DOBLE,
-          actions: [EnvidoActions.RAISE_ENVIDO],
+          actions: [EnvidoActions.RAISE_ENVIDO, EnvidoActions.CHANGE_TURN],
         },
         [EnvidoEvents.RAISE_REAL_ENVIDO]: {
           target: EnvidoStates.REAL_ENVIDO,
-          actions: [EnvidoActions.RAISE_REAL_ENVIDO],
+          actions: [EnvidoActions.RAISE_REAL_ENVIDO, EnvidoActions.CHANGE_TURN],
         },
         [EnvidoEvents.RAISE_FALTA_ENVIDO]: {
           target: EnvidoStates.FALTA_ENVIDO,
-          actions: [EnvidoActions.RAISE_FALTA_ENVIDO],
+          actions: [
+            EnvidoActions.RAISE_FALTA_ENVIDO,
+            EnvidoActions.CHANGE_TURN,
+          ],
         },
         [EnvidoEvents.ACCEPT]: {
           target: EnvidoStates.ACCEPTED,
@@ -57,11 +64,14 @@ export const envidoMachine = envidoSetup.createMachine({
       on: {
         [EnvidoEvents.RAISE_REAL_ENVIDO]: {
           target: EnvidoStates.REAL_ENVIDO,
-          actions: [EnvidoActions.RAISE_REAL_ENVIDO],
+          actions: [EnvidoActions.RAISE_REAL_ENVIDO, EnvidoActions.CHANGE_TURN],
         },
         [EnvidoEvents.RAISE_FALTA_ENVIDO]: {
           target: EnvidoStates.FALTA_ENVIDO,
-          actions: [EnvidoActions.RAISE_FALTA_ENVIDO],
+          actions: [
+            EnvidoActions.RAISE_FALTA_ENVIDO,
+            EnvidoActions.CHANGE_TURN,
+          ],
         },
         [EnvidoEvents.ACCEPT]: {
           target: EnvidoStates.ACCEPTED,
@@ -76,7 +86,10 @@ export const envidoMachine = envidoSetup.createMachine({
       on: {
         [EnvidoEvents.RAISE_FALTA_ENVIDO]: {
           target: EnvidoStates.FALTA_ENVIDO,
-          actions: [EnvidoActions.RAISE_FALTA_ENVIDO],
+          actions: [
+            EnvidoActions.RAISE_FALTA_ENVIDO,
+            EnvidoActions.CHANGE_TURN,
+          ],
         },
         [EnvidoEvents.ACCEPT]: {
           target: EnvidoStates.ACCEPTED,
@@ -100,12 +113,12 @@ export const envidoMachine = envidoSetup.createMachine({
 
     [EnvidoStates.DECLINED]: {
       type: 'final',
-      entry: EnvidoActions.DECLINE_ENVIDO,
+      entry: [EnvidoActions.DECLINE_ENVIDO, EnvidoActions.CHANGE_TURN],
     },
 
     [EnvidoStates.ACCEPTED]: {
       type: 'final',
-      entry: EnvidoActions.ACCEPT_ENVIDO,
+      entry: [EnvidoActions.ACCEPT_ENVIDO, EnvidoActions.CHANGE_TURN],
     },
   },
 });

@@ -1,0 +1,922 @@
+{
+  "info": {
+    "name": "Truco Rooms Socket Endpoints",
+    "description": "Socket.IO endpoints for Truco game room management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Connection Events",
+      "item": [
+        {
+          "name": "Connect to Socket",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:3000/socket.io/?EIO=4&transport=websocket",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"],
+              "query": [
+                {
+                  "key": "EIO",
+                  "value": "4"
+                },
+                {
+                  "key": "transport",
+                  "value": "websocket"
+                }
+              ]
+            },
+            "description": "Establish WebSocket connection - triggers 'connected' event"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Room",
+      "item": [
+        {
+          "name": "Create Room - Valid Case",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"createRoom\",\n  \"data\": {\n    \"playerId\": \"player-123\",\n    \"options\": {\n      \"maxPlayers\": 4,\n      \"betAmount\": 100\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Create a new room with valid parameters"
+          }
+        },
+        {
+          "name": "Create Room - Minimum Players",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"createRoom\",\n  \"data\": {\n    \"playerId\": \"player-456\",\n    \"options\": {\n      \"maxPlayers\": 2,\n      \"betAmount\": 50\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Create room with minimum players (2)"
+          }
+        },
+        {
+          "name": "Create Room - Maximum Players",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"createRoom\",\n  \"data\": {\n    \"playerId\": \"player-789\",\n    \"options\": {\n      \"maxPlayers\": 6,\n      \"betAmount\": 500\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Create room with maximum players (6)"
+          }
+        },
+        {
+          "name": "Create Room - Zero Bet Amount",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"createRoom\",\n  \"data\": {\n    \"playerId\": \"player-free\",\n    \"options\": {\n      \"maxPlayers\": 4,\n      \"betAmount\": 0\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Create room with zero bet amount (free game)"
+          }
+        },
+        {
+          "name": "Create Room - Player Already In Room",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"createRoom\",\n  \"data\": {\n    \"playerId\": \"player-123\",\n    \"options\": {\n      \"maxPlayers\": 4,\n      \"betAmount\": 100\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Attempt to create room when player is already in a room - should fail"
+          }
+        },
+        {
+          "name": "Create Room - Invalid Player ID",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"createRoom\",\n  \"data\": {\n    \"playerId\": \"nonexistent-player\",\n    \"options\": {\n      \"maxPlayers\": 4,\n      \"betAmount\": 100\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Attempt to create room with invalid/nonexistent player ID"
+          }
+        },
+        {
+          "name": "Create Room - Missing Required Fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"createRoom\",\n  \"data\": {\n    \"playerId\": \"player-incomplete\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Attempt to create room without options - should fail validation"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Join Room",
+      "item": [
+        {
+          "name": "Join Room - Valid Case",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"joinRoom\",\n  \"data\": {\n    \"roomId\": \"room-uuid-123\",\n    \"playerId\": \"player-456\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Join an existing room with valid credentials"
+          }
+        },
+        {
+          "name": "Join Room - Second Player",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"joinRoom\",\n  \"data\": {\n    \"roomId\": \"room-uuid-123\",\n    \"playerId\": \"player-789\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Second player joins the room"
+          }
+        },
+        {
+          "name": "Join Room - Third Player",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"joinRoom\",\n  \"data\": {\n    \"roomId\": \"room-uuid-123\",\n    \"playerId\": \"player-abc\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Third player joins the room"
+          }
+        },
+        {
+          "name": "Join Room - Room Full",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"joinRoom\",\n  \"data\": {\n    \"roomId\": \"room-uuid-123\",\n    \"playerId\": \"player-overflow\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Attempt to join a full room - should fail"
+          }
+        },
+        {
+          "name": "Join Room - Nonexistent Room",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"joinRoom\",\n  \"data\": {\n    \"roomId\": \"nonexistent-room-id\",\n    \"playerId\": \"player-456\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Attempt to join a nonexistent room - should fail"
+          }
+        },
+        {
+          "name": "Join Room - Player Already In Room",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"joinRoom\",\n  \"data\": {\n    \"roomId\": \"another-room-id\",\n    \"playerId\": \"player-456\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Attempt to join another room when already in a room - should fail"
+          }
+        },
+        {
+          "name": "Join Room - Invalid Player ID",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"joinRoom\",\n  \"data\": {\n    \"roomId\": \"room-uuid-123\",\n    \"playerId\": \"invalid-player\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Attempt to join room with invalid player ID - should fail"
+          }
+        },
+        {
+          "name": "Join Room - Missing Fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"joinRoom\",\n  \"data\": {\n    \"roomId\": \"room-uuid-123\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Attempt to join room without player ID - should fail validation"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Leave Room",
+      "item": [
+        {
+          "name": "Leave Room - Valid Case (Non-Owner)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"leaveRoom\",\n  \"data\": {\n    \"roomId\": \"room-uuid-123\",\n    \"playerId\": \"player-456\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Non-owner player leaves room - room should continue"
+          }
+        },
+        {
+          "name": "Leave Room - Owner Leaves (Room Deleted)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"leaveRoom\",\n  \"data\": {\n    \"roomId\": \"room-uuid-123\",\n    \"playerId\": \"player-123\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Owner leaves room - room should be deleted"
+          }
+        },
+        {
+          "name": "Leave Room - Last Player Leaves",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"leaveRoom\",\n  \"data\": {\n    \"roomId\": \"room-uuid-456\",\n    \"playerId\": \"player-solo\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Last player leaves room - room should be deleted"
+          }
+        },
+        {
+          "name": "Leave Room - Player Not In Room",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"leaveRoom\",\n  \"data\": {\n    \"roomId\": \"room-uuid-123\",\n    \"playerId\": \"player-not-in-room\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Attempt to leave room when not in any room - should fail"
+          }
+        },
+        {
+          "name": "Leave Room - Nonexistent Room",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"leaveRoom\",\n  \"data\": {\n    \"roomId\": \"nonexistent-room\",\n    \"playerId\": \"player-456\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Attempt to leave nonexistent room - should fail"
+          }
+        },
+        {
+          "name": "Leave Room - Invalid Player ID",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"leaveRoom\",\n  \"data\": {\n    \"roomId\": \"room-uuid-123\",\n    \"playerId\": \"invalid-player\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Attempt to leave room with invalid player ID - should fail"
+          }
+        },
+        {
+          "name": "Leave Room - Missing Fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"leaveRoom\",\n  \"data\": {\n    \"playerId\": \"player-456\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Attempt to leave room without room ID - should fail validation"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Server Events Examples",
+      "item": [
+        {
+          "name": "Listen for Connected Event",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:3000/socket.io/?EIO=4&transport=websocket",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"],
+              "query": [
+                {
+                  "key": "EIO",
+                  "value": "4"
+                },
+                {
+                  "key": "transport",
+                  "value": "websocket"
+                }
+              ]
+            },
+            "description": "Listen for 'connected' event with response: { message: 'Player connected', socketId: 'socket-id' }"
+          }
+        },
+        {
+          "name": "Listen for Room Created Event",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:3000/socket.io/?EIO=4&transport=websocket",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"],
+              "query": [
+                {
+                  "key": "EIO",
+                  "value": "4"
+                },
+                {
+                  "key": "transport",
+                  "value": "websocket"
+                }
+              ]
+            },
+            "description": "Listen for 'roomCreated' event with room data"
+          }
+        },
+        {
+          "name": "Listen for Room Updated Event",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:3000/socket.io/?EIO=4&transport=websocket",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"],
+              "query": [
+                {
+                  "key": "EIO",
+                  "value": "4"
+                },
+                {
+                  "key": "transport",
+                  "value": "websocket"
+                }
+              ]
+            },
+            "description": "Listen for 'roomUpdated' event when players join/leave"
+          }
+        },
+        {
+          "name": "Listen for Disconnected Event",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:3000/socket.io/?EIO=4&transport=websocket",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"],
+              "query": [
+                {
+                  "key": "EIO",
+                  "value": "4"
+                },
+                {
+                  "key": "transport",
+                  "value": "websocket"
+                }
+              ]
+            },
+            "description": "Listen for 'disconnected' event with response: { message: 'Player disconnected', socketId: 'socket-id' }"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Edge Cases & Error Scenarios",
+      "item": [
+        {
+          "name": "Invalid Event Name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"invalidEvent\",\n  \"data\": {\n    \"playerId\": \"player-123\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Send invalid event name - should be ignored or error"
+          }
+        },
+        {
+          "name": "Malformed JSON",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"createRoom\",\n  \"data\": {\n    \"playerId\": \"player-123\",\n    \"options\": {\n      \"maxPlayers\": \"invalid-number\",\n      \"betAmount\": \"not-a-number\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Send invalid data types - should fail validation"
+          }
+        },
+        {
+          "name": "Empty Data Object",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"createRoom\",\n  \"data\": {}\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Send empty data object - should fail validation"
+          }
+        },
+        {
+          "name": "Null Values",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"joinRoom\",\n  \"data\": {\n    \"roomId\": null,\n    \"playerId\": null\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Send null values - should fail validation"
+          }
+        },
+        {
+          "name": "Very Long String Values",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"createRoom\",\n  \"data\": {\n    \"playerId\": \"player-with-very-long-id-that-exceeds-normal-limits-and-might-cause-issues-with-storage-or-processing-systems-abcdefghijklmnopqrstuvwxyz1234567890\",\n    \"options\": {\n      \"maxPlayers\": 4,\n      \"betAmount\": 100\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Send very long string values - test string length limits"
+          }
+        },
+        {
+          "name": "Negative Bet Amount",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"createRoom\",\n  \"data\": {\n    \"playerId\": \"player-negative\",\n    \"options\": {\n      \"maxPlayers\": 4,\n      \"betAmount\": -100\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Create room with negative bet amount - should fail validation"
+          }
+        },
+        {
+          "name": "Zero Max Players",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"createRoom\",\n  \"data\": {\n    \"playerId\": \"player-zero\",\n    \"options\": {\n      \"maxPlayers\": 0,\n      \"betAmount\": 100\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Create room with zero max players - should fail validation"
+          }
+        },
+        {
+          "name": "Excessive Max Players",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"createRoom\",\n  \"data\": {\n    \"playerId\": \"player-excessive\",\n    \"options\": {\n      \"maxPlayers\": 1000,\n      \"betAmount\": 100\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/socket.io/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["socket.io"]
+            },
+            "description": "Create room with excessive max players - should fail validation or be capped"
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "wsUrl",
+      "value": "ws://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "sampleRoomId",
+      "value": "room-uuid-123",
+      "type": "string"
+    },
+    {
+      "key": "samplePlayerId",
+      "value": "player-123",
+      "type": "string"
+    }
+  ]
+}

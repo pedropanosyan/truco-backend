@@ -28,6 +28,25 @@ export const RANK_ENVIDO_VALUES: Record<Rank, number> = {
   [Rank.TWELVE]: 0,
 };
 
+export const RANKING_TRUCO_VALUES: Record<string, number> = {
+  'ESPADA-1': 14,
+  'BASTO-1': 13,
+  'ESPADA-7': 12,
+  'ORO-7': 11,
+  'ANY-3': 10,
+  'ANY-2': 9,
+  'COPA-1': 8,
+  'ORO-1': 8,
+  'ANY-12': 7,
+  'ANY-11': 7,
+  'ANY-10': 7,
+  'COPA-7': 6,
+  'BASTO-7': 6,
+  'ANY-6': 5,
+  'ANY-5': 4,
+  'ANY-4': 3,
+};
+
 export enum Suit {
   COPA = 'COPA',
   ORO = 'ORO',
@@ -53,6 +72,8 @@ export enum HandStates {
   ENVIDO_PHASE_IDLE = 'ENVIDO_PHASE_IDLE',
   ENVIDO_PHASE_PLAYING = 'ENVIDO_PHASE_PLAYING',
   TRUCO_PHASE = 'TRUCO_PHASE',
+  TRUCO_PHASE_IDLE = 'TRUCO_PHASE_IDLE',
+  TRUCO_PHASE_PLAYING = 'TRUCO_PHASE_PLAYING',
   HAND_END = 'HAND_END',
 }
 
@@ -86,8 +107,13 @@ export enum HandActions {
   HANDLE_FORFEIT = 'HANDLE_FORFEIT',
   UPDATE_ENVIDO_POINTS = 'UPDATE_ENVIDO_POINTS',
   UPDATE_TRUCO_POINTS = 'UPDATE_TRUCO_POINTS',
+  ENVIDO_ACCEPTED = 'ENVIDO_ACCEPTED',
+  ENVIDO_DECLINED = 'ENVIDO_DECLINED',
+  TRUCO_ACCEPTED = 'TRUCO_ACCEPTED',
+  TRUCO_DECLINED = 'TRUCO_DECLINED',
   CLOSE_ENVIDO = 'CLOSE_ENVIDO',
   RESET_HAND = 'RESET_HAND',
+  CHANGE_TURN = 'CHANGE_TURN',
 }
 
 // ============================================================================
@@ -122,10 +148,8 @@ export interface HandContext {
   cardPlays: { playerId: string; card: Card }[];
   currentTurn: string;
   startingPlayer: string;
-  trucoPoints: number;
   scoreLimit: number;
   currentScores: Record<Player['id'], number>;
-  trucoWinnerPlayerId: string | undefined;
 }
 
 // ============================================================================

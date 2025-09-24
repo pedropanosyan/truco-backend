@@ -10,8 +10,8 @@ import {
   callEnvidoAgain,
   callToFaltaEnvido,
   callToRealEnvido,
+  getRejectedPoints,
 } from './rules';
-
 export const envidoSetup = setup({
   types: {
     events: {} as EnvidoEventPayloads,
@@ -38,7 +38,10 @@ export const envidoSetup = setup({
     })),
     [EnvidoActions.DECLINE_ENVIDO]: sendParent(({ context }) => ({
       type: EnvidoActions.DECLINE_ENVIDO,
-      points: context.pointsOnStake,
+      points: getRejectedPoints(context),
     })),
+    [EnvidoActions.CHANGE_TURN]: ({ context }) => {
+      context.next();
+    },
   },
 });

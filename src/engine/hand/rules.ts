@@ -5,18 +5,19 @@ import {
   Suit,
   Hand,
   RANK_ENVIDO_VALUES,
+  RANKING_TRUCO_VALUES,
 } from './types';
 
-const isCurrentTurn = (context: HandContext, playerId: string): boolean => {
-  return context.currentTurn === playerId;
-};
-
-const next = (context: HandContext, playerId: string) => {
+const getNextPlayer = (context: HandContext): string => {
   const currentPlayerIndex = context.players.findIndex(
-    (p) => p.id === playerId,
+    (p) => p.id === context.currentTurn,
   );
   const nextPlayerIndex = (currentPlayerIndex + 1) % context.players.length;
-  context.currentTurn = context.players[nextPlayerIndex].id;
+  return context.players[nextPlayerIndex].id;
+};
+
+const next = (context: HandContext) => {
+  context.currentTurn = getNextPlayer(context);
 };
 
 const hasCard = (
@@ -62,6 +63,14 @@ const dealCards = (context: HandContext) => {
       startIndex + cardsPerPlayer,
     );
   });
+};
+
+const getTrucoRankingValue = (card: Card): number => {
+  return (
+    RANKING_TRUCO_VALUES[`${card.suit}-${card.rank}`] ??
+    RANKING_TRUCO_VALUES[`ANY-${card.rank}`] ??
+    0
+  );
 };
 
 const getEnvido = (cards: Hand): number => {
@@ -115,28 +124,22 @@ const allPlayersPlayedFirstCard = (context: HandContext): boolean => {
   );
 };
 
-const shouldCloseEnvido = (context: HandContext, playerId: string): boolean => {
-  // Check if all players have played their first card and current player is about to play their second
+const shouldCloseEnvido = (context: HandContext): boolean => {
   const allPlayedFirst = allPlayersPlayedFirstCard(context);
   const currentPlayerCards = context.cardPlays.filter(
-    (play) => play.playerId === playerId,
+    (play) => play.playerId === context.currentTurn,
   ).length;
   return allPlayedFirst && currentPlayerCards === 1;
 };
 
-const endHand = (context: HandContext) => {
-  // Logic to end the hand and reset for next hand
+const getForfeitPoints = (context: HandContext): number => {
+  if (context.cardPlays.length >= context.players.length - 1) {
+    return 1;
+  }
+  return 2;
 };
 
-const handleForfeit = (context: HandContext, playerId: string) => {
-  // Logic to handle player forfeit
-  // Could involve ending the hand or round
-};
-
-const updateEnvidoPoints = (
-  context: HandContext,
-  points: number,
-): { envidoPoints: number; winnerPlayerId: string } => {
+const getEnvidoWinner = (context: HandContext): string => {
   const envidoByPlayer = context.players.map((player) => ({
     playerId: player.id,
     envido: getEnvido(context.hands[player.id]),
@@ -146,26 +149,78 @@ const updateEnvidoPoints = (
     current.envido > best.envido ? current : best,
   );
 
-  return {
-    envidoPoints: points,
-    winnerPlayerId: winner.playerId,
-  };
+  return winner.playerId;
 };
 
-const updateTrucoPoints = (context: HandContext, points: number) => {
-  context.trucoPoints += points;
+const getTrucoWinner = (context: HandContext): string => {
+  // Group card plays into rounds (pairs of cards)
+  const rounds: { playerId: string; card: Card }[][] = [];
+
+  for (let i = 0; i < context.cardPlays.length; i += 2) {
+    const roundPlays = context.cardPlays.slice(i, i + 2);
+    if (roundPlays.length === 2) {
+      rounds.push(roundPlays);
+    }
+  }
+
+  const score: Record<string, number> = {};
+
+  // Evaluate each round
+  for (const round of rounds) {
+    if (round.length < 2) break;
+
+    const [playA, playB] = round;
+    const valueA = getTrucoRankingValue(playA.card);
+    const valueB = getTrucoRankingValue(playB.card);
+
+    if (valueA > valueB) {
+      score[playA.playerId] = (score[playA.playerId] || 0) + 1;
+    } else if (valueB > valueA) {
+      score[playB.playerId] = (score[playB.playerId] || 0) + 1;
+    }
+    // If tied, neither player gets a point for this round
+  }
+
+  const playerIds = context.players.map((p) => p.id);
+
+  // Check if someone won 2 out of 3 rounds
+  for (const playerId of playerIds) {
+    if ((score[playerId] || 0) >= 2) {
+      return playerId;
+    }
+  }
+
+  // Special case: if first round was tied and second round has a winner
+  if (rounds.length >= 2) {
+    const [round1, round2] = rounds;
+    const value1A = getTrucoRankingValue(round1[0].card);
+    const value1B = getTrucoRankingValue(round1[1].card);
+
+    if (value1A === value1B) {
+      // First round tied
+      const value2A = getTrucoRankingValue(round2[0].card);
+      const value2B = getTrucoRankingValue(round2[1].card);
+
+      if (value2A > value2B) {
+        return round2[0].playerId;
+      }
+      if (value2B > value2A) {
+        return round2[1].playerId;
+      }
+    }
+  }
+
+  // If all rounds are tied or no clear winner, the starting player (mano) wins
+  return context.startingPlayer;
 };
 
 const resetHand = (context: HandContext) => {
-  // Reset the hand for a new game
   context.hands = {};
   context.cardPlays = [];
-  context.trucoPoints = 0;
-  context.currentTurn = context.startingPlayer;
+  context.startingPlayer = context.currentTurn
 };
 
 export {
-  isCurrentTurn,
   next,
   hasCard,
   dealCards,
@@ -173,9 +228,8 @@ export {
   playCard,
   allPlayersPlayedFirstCard,
   shouldCloseEnvido,
-  endHand,
-  handleForfeit,
-  updateEnvidoPoints,
-  updateTrucoPoints,
+  getForfeitPoints,
+  getEnvidoWinner,
+  getTrucoWinner,
   resetHand,
 };

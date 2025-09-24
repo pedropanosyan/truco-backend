@@ -47,6 +47,7 @@ export enum EnvidoActions {
   RAISE_FALTA_ENVIDO = 'RAISE_FALTA_ENVIDO',
   DECLINE_ENVIDO = 'DECLINE_ENVIDO',
   ACCEPT_ENVIDO = 'ACCEPT_ENVIDO',
+  CHANGE_TURN = 'CHANGE_TURN',
 }
 
 // ============================================================================
@@ -68,6 +69,8 @@ export type EnvidoEventPayloads =
 export interface EnvidoContext {
   /** Current points at stake in the envido */
   pointsOnStake: number;
+  /** Last points at stake in the envido */
+  lastBid: EnvidoBid | undefined;
   /** Maximum score limit for the game */
   scoreLimit: number;
   /** Current highest score among players */

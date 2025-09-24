@@ -42,9 +42,13 @@ export const gameSetup = setup({
     [GameActions.END_GAME]: ({ context }) => {
       endGame(context);
     },
-    [GameActions.UPDATE_GAME_POINTS]: ({ context, event }) => {
+    [GameActions.UPDATE_GAME_POINTS]: ({ context, event, self }) => {
       if (event.type === GameEvents.UPDATE_GAME_POINTS) {
         updateScores(context, event.playerId, event.points);
+        const winnerId = checkWinCondition(context);
+        if (winnerId) {
+          self.send({ type: GameEvents.END_GAME, winnerId });
+        }
       }
     },
   },

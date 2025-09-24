@@ -1,14 +1,35 @@
 import { createActor } from 'xstate';
 import { envidoMachine } from './machine';
-import { EnvidoEvents, EnvidoStates } from './types';
+import { EnvidoEvents, EnvidoStates, EnvidoActions } from './types';
+import { getRejectedPoints } from './rules';
 
 describe('Envido Machine', () => {
   const mockNextTurn = jest.fn();
+  const mockSendParent = jest.fn();
   const defaultInput = {
     scoreLimit: 30,
     greaterScore: 0,
+    lastBid: undefined,
     next: mockNextTurn,
   };
+
+  // Create test machine with mocked actions
+  const testMachine = envidoMachine.provide({
+    actions: {
+      [EnvidoActions.ACCEPT_ENVIDO]: ({ context }) => {
+        mockSendParent({
+          type: EnvidoActions.ACCEPT_ENVIDO,
+          points: context.pointsOnStake,
+        });
+      },
+      [EnvidoActions.DECLINE_ENVIDO]: ({ context }) => {
+        mockSendParent({
+          type: EnvidoActions.DECLINE_ENVIDO,
+          points: getRejectedPoints(context),
+        });
+      },
+    },
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -17,7 +38,7 @@ describe('Envido Machine', () => {
   describe('Initial State', () => {
     it('should start in IDLE state with correct initial context', () => {
       // Arrange
-      const actor = createActor(envidoMachine, {
+      const actor = createActor(testMachine, {
         input: defaultInput,
       });
       // Act
@@ -33,7 +54,7 @@ describe('Envido Machine', () => {
   describe('IDLE State Transitions', () => {
     it('should transition to ENVIDO state when CALL_ENVIDO event is sent', () => {
       // Arrange
-      const actor = createActor(envidoMachine, {
+      const actor = createActor(testMachine, {
         input: defaultInput,
       });
       actor.start();
@@ -49,7 +70,7 @@ describe('Envido Machine', () => {
 
     it('should transition to REAL_ENVIDO state when RAISE_REAL_ENVIDO event is sent', () => {
       // Arrange
-      const actor = createActor(envidoMachine, {
+      const actor = createActor(testMachine, {
         input: defaultInput,
       });
       actor.start();
@@ -65,7 +86,7 @@ describe('Envido Machine', () => {
 
     it('should transition to FALTA_ENVIDO state when RAISE_FALTA_ENVIDO event is sent', () => {
       // Arrange
-      const actor = createActor(envidoMachine, {
+      const actor = createActor(testMachine, {
         input: defaultInput,
       });
       actor.start();
@@ -86,7 +107,7 @@ describe('Envido Machine', () => {
         greaterScore: 5,
         next: mockNextTurn,
       };
-      const actor = createActor(envidoMachine, {
+      const actor = createActor(testMachine, {
         input: customInput,
       });
       actor.start();
@@ -102,10 +123,10 @@ describe('Envido Machine', () => {
   });
 
   describe('ENVIDO State Transitions', () => {
-    let actor: ReturnType<typeof createActor<typeof envidoMachine>>;
+    let actor: ReturnType<typeof createActor<typeof testMachine>>;
 
     beforeEach(() => {
-      actor = createActor(envidoMachine, { input: defaultInput });
+      actor = createActor(testMachine, { input: defaultInput });
       actor.start();
       actor.send({ type: EnvidoEvents.CALL_ENVIDO });
     });
@@ -139,13 +160,39 @@ describe('Envido Machine', () => {
       expect(actor.getSnapshot().context.pointsOnStake).toBe(30); // 2 + (30 - 0)
       expect(mockNextTurn).toHaveBeenCalledTimes(2); // Once for initial CALL_ENVIDO, once for raise
     });
+
+    it('should transition to ACCEPTED when ACCEPT event is sent', () => {
+      // Act
+      actor.send({ type: EnvidoEvents.ACCEPT });
+
+      // Assert
+      expect(actor.getSnapshot().value).toBe(EnvidoStates.ACCEPTED);
+      expect(actor.getSnapshot().context.pointsOnStake).toBe(2);
+      expect(mockSendParent).toHaveBeenCalledWith({
+        type: EnvidoActions.ACCEPT_ENVIDO,
+        points: 2,
+      });
+    });
+
+    it('should transition to DECLINED when DECLINE event is sent', () => {
+      // Act
+      actor.send({ type: EnvidoEvents.DECLINE });
+
+      // Assert
+      expect(actor.getSnapshot().value).toBe(EnvidoStates.DECLINED);
+      expect(actor.getSnapshot().context.pointsOnStake).toBe(2);
+      expect(mockSendParent).toHaveBeenCalledWith({
+        type: EnvidoActions.DECLINE_ENVIDO,
+        points: 1,
+      });
+    });
   });
 
   describe('ENVIDO_DOBLE State Transitions', () => {
-    let actor: ReturnType<typeof createActor<typeof envidoMachine>>;
+    let actor: ReturnType<typeof createActor<typeof testMachine>>;
 
     beforeEach(() => {
-      actor = createActor(envidoMachine, { input: defaultInput });
+      actor = createActor(testMachine, { input: defaultInput });
       actor.start();
       actor.send({ type: EnvidoEvents.CALL_ENVIDO });
       actor.send({ type: EnvidoEvents.CALL_ENVIDO });
@@ -171,6 +218,32 @@ describe('Envido Machine', () => {
       expect(mockNextTurn).toHaveBeenCalledTimes(3); // Initial + ENVIDO + FALTA_ENVIDO
     });
 
+    it('should transition to ACCEPTED when ACCEPT event is sent', () => {
+      // Act
+      actor.send({ type: EnvidoEvents.ACCEPT });
+
+      // Assert
+      expect(actor.getSnapshot().value).toBe(EnvidoStates.ACCEPTED);
+      expect(actor.getSnapshot().context.pointsOnStake).toBe(4);
+      expect(mockSendParent).toHaveBeenCalledWith({
+        type: EnvidoActions.ACCEPT_ENVIDO,
+        points: 4,
+      });
+    });
+
+    it('should transition to DECLINED when DECLINE event is sent', () => {
+      // Act
+      actor.send({ type: EnvidoEvents.DECLINE });
+
+      // Assert
+      expect(actor.getSnapshot().value).toBe(EnvidoStates.DECLINED);
+      expect(actor.getSnapshot().context.pointsOnStake).toBe(4);
+      expect(mockSendParent).toHaveBeenCalledWith({
+        type: EnvidoActions.DECLINE_ENVIDO,
+        points: 2,
+      });
+    });
+
     it('should not respond to CALL_ENVIDO event in ENVIDO_DOBLE state', () => {
       // Act
       actor.send({ type: EnvidoEvents.CALL_ENVIDO });
@@ -183,10 +256,10 @@ describe('Envido Machine', () => {
   });
 
   describe('REAL_ENVIDO State Transitions', () => {
-    let actor: ReturnType<typeof createActor<typeof envidoMachine>>;
+    let actor: ReturnType<typeof createActor<typeof testMachine>>;
 
     beforeEach(() => {
-      actor = createActor(envidoMachine, { input: defaultInput });
+      actor = createActor(testMachine, { input: defaultInput });
       actor.start();
       actor.send({ type: EnvidoEvents.RAISE_REAL_ENVIDO });
     });
@@ -199,6 +272,32 @@ describe('Envido Machine', () => {
       expect(actor.getSnapshot().value).toBe(EnvidoStates.FALTA_ENVIDO);
       expect(actor.getSnapshot().context.pointsOnStake).toBe(30); // 3 + (30 - 0)
       expect(mockNextTurn).toHaveBeenCalledTimes(2); // Initial + FALTA_ENVIDO
+    });
+
+    it('should transition to ACCEPTED when ACCEPT event is sent', () => {
+      // Act
+      actor.send({ type: EnvidoEvents.ACCEPT });
+
+      // Assert
+      expect(actor.getSnapshot().value).toBe(EnvidoStates.ACCEPTED);
+      expect(actor.getSnapshot().context.pointsOnStake).toBe(3);
+      expect(mockSendParent).toHaveBeenCalledWith({
+        type: EnvidoActions.ACCEPT_ENVIDO,
+        points: 3,
+      });
+    });
+
+    it('should transition to DECLINED when DECLINE event is sent', () => {
+      // Act
+      actor.send({ type: EnvidoEvents.DECLINE });
+
+      // Assert
+      expect(actor.getSnapshot().value).toBe(EnvidoStates.DECLINED);
+      expect(actor.getSnapshot().context.pointsOnStake).toBe(3);
+      expect(mockSendParent).toHaveBeenCalledWith({
+        type: EnvidoActions.DECLINE_ENVIDO,
+        points: getRejectedPoints(actor.getSnapshot().context),
+      });
     });
 
     it('should not respond to CALL_ENVIDO or RAISE_REAL_ENVIDO events in REAL_ENVIDO state', () => {
@@ -217,13 +316,39 @@ describe('Envido Machine', () => {
   });
 
   describe('FALTA_ENVIDO State Transitions', () => {
-    let actor: ReturnType<typeof createActor<typeof envidoMachine>>;
+    let actor: ReturnType<typeof createActor<typeof testMachine>>;
 
     beforeEach(() => {
-      actor = createActor(envidoMachine, { input: defaultInput });
+      actor = createActor(testMachine, { input: defaultInput });
       actor.start();
       actor.send({
         type: EnvidoEvents.RAISE_FALTA_ENVIDO,
+      });
+    });
+
+    it('should transition to ACCEPTED when ACCEPT event is sent', () => {
+      // Act
+      actor.send({ type: EnvidoEvents.ACCEPT });
+
+      // Assert
+      expect(actor.getSnapshot().value).toBe(EnvidoStates.ACCEPTED);
+      expect(actor.getSnapshot().context.pointsOnStake).toBe(30);
+      expect(mockSendParent).toHaveBeenCalledWith({
+        type: EnvidoActions.ACCEPT_ENVIDO,
+        points: 30,
+      });
+    });
+
+    it('should transition to DECLINED when DECLINE event is sent', () => {
+      // Act
+      actor.send({ type: EnvidoEvents.DECLINE });
+
+      // Assert
+      expect(actor.getSnapshot().value).toBe(EnvidoStates.DECLINED);
+      expect(actor.getSnapshot().context.pointsOnStake).toBe(30);
+      expect(mockSendParent).toHaveBeenCalledWith({
+        type: EnvidoActions.DECLINE_ENVIDO,
+        points: 29,
       });
     });
 
@@ -248,6 +373,36 @@ describe('Envido Machine', () => {
     });
   });
 
+  describe('Final States', () => {
+    it('should be in ACCEPTED final state after accepting', () => {
+      // Arrange
+      const actor = createActor(testMachine, { input: defaultInput });
+      actor.start();
+      actor.send({ type: EnvidoEvents.CALL_ENVIDO });
+
+      // Act
+      actor.send({ type: EnvidoEvents.ACCEPT });
+
+      // Assert
+      expect(actor.getSnapshot().value).toBe(EnvidoStates.ACCEPTED);
+      expect(actor.getSnapshot().status).toBe('done');
+    });
+
+    it('should be in DECLINED final state after declining', () => {
+      // Arrange
+      const actor = createActor(testMachine, { input: defaultInput });
+      actor.start();
+      actor.send({ type: EnvidoEvents.CALL_ENVIDO });
+
+      // Act
+      actor.send({ type: EnvidoEvents.DECLINE });
+
+      // Assert
+      expect(actor.getSnapshot().value).toBe(EnvidoStates.DECLINED);
+      expect(actor.getSnapshot().status).toBe('done');
+    });
+  });
+
   describe('Context Updates', () => {
     it('should correctly calculate points for FALTA_ENVIDO based on scoreLimit and greaterScore', () => {
       // Test with different scoreLimit and greaterScore values
@@ -256,7 +411,7 @@ describe('Envido Machine', () => {
         greaterScore: 5,
         next: mockNextTurn,
       };
-      const actor = createActor(envidoMachine, {
+      const actor = createActor(testMachine, {
         input: customInput,
       });
       actor.start();
@@ -270,7 +425,7 @@ describe('Envido Machine', () => {
 
     it('should accumulate points correctly through multiple raises', () => {
       // Arrange
-      const actor = createActor(envidoMachine, {
+      const actor = createActor(testMachine, {
         input: defaultInput,
       });
       actor.start();
@@ -287,7 +442,7 @@ describe('Envido Machine', () => {
 
     it('should call nextTurn after each valid action', () => {
       // Arrange
-      const actor = createActor(envidoMachine, {
+      const actor = createActor(testMachine, {
         input: defaultInput,
       });
       actor.start();
@@ -313,7 +468,7 @@ describe('Envido Machine', () => {
   describe('State Machine Properties', () => {
     it('should maintain state consistency across transitions', () => {
       // Arrange
-      const actor = createActor(envidoMachine, {
+      const actor = createActor(testMachine, {
         input: defaultInput,
       });
       actor.start();
@@ -330,7 +485,7 @@ describe('Envido Machine', () => {
 
     it('should preserve context during invalid transitions', () => {
       // Arrange
-      const actor = createActor(envidoMachine, {
+      const actor = createActor(testMachine, {
         input: defaultInput,
       });
       actor.start();

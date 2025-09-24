@@ -1,4 +1,4 @@
-import { GameContext, GameStates, GameEvents, GAME_RULES } from './types';
+import { GameContext, GameEvents, GAME_RULES } from './types';
 
 // ============================================================================
 // GAME VALIDATION
@@ -43,7 +43,11 @@ export const startGame = (context: GameContext, event: any): void => {
 };
 
 export const endGame = (context: GameContext): void => {
-  // Game end logic - could add winner tracking here if needed
+  const winnerId = checkWinCondition(context);
+  if (winnerId) {
+    // Winner found - game ends
+    console.log(`Game ended! Winner: ${winnerId}`);
+  }
 };
 
 export const updateScores = (

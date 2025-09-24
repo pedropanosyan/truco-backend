@@ -1,4 +1,4 @@
-import { setup } from 'xstate';
+import { setup, sendParent } from 'xstate';
 import {
   HandActions,
   HandContext,
@@ -9,17 +9,17 @@ import {
 import {
   dealCards,
   playCard,
-  endHand,
-  handleForfeit,
-  updateEnvidoPoints,
-  updateTrucoPoints,
-  isCurrentTurn,
+  getEnvidoWinner,
+  getTrucoWinner,
   hasCard,
   resetHand,
   shouldCloseEnvido,
   next,
+  getForfeitPoints,
 } from './rules';
 import { envidoMachine } from '../envido/machine';
+import { trucoMachine } from '../truco/machine';
+import { GameActions } from '../game';
 
 export const handSetup = setup({
   types: {
@@ -30,33 +30,21 @@ export const handSetup = setup({
 
   actors: {
     envido: envidoMachine,
+    truco: trucoMachine,
   },
 
   guards: {
-    isCurrentTurn: ({ context, event }): boolean => {
-      if (
-        event.type === HandEvents.PLAY_CARD ||
-        event.type === HandEvents.FORFEIT
-      ) {
-        return isCurrentTurn(context, event.playerId);
-      }
-      return false;
-    },
     canPlayCard: ({ context, event }): boolean => {
       if (event.type === HandEvents.PLAY_CARD) {
-        return (
-          isCurrentTurn(context, event.playerId) &&
-          hasCard(context, event.playerId, event.card)
-        );
+        return hasCard(context, event.playerId, event.card);
       }
       return false;
     },
     canPlayCardAndCloseEnvido: ({ context, event }): boolean => {
       if (event.type === HandEvents.PLAY_CARD) {
         return (
-          isCurrentTurn(context, event.playerId) &&
           hasCard(context, event.playerId, event.card) &&
-          shouldCloseEnvido(context, event.playerId)
+          shouldCloseEnvido(context)
         );
       }
       return false;
@@ -67,31 +55,50 @@ export const handSetup = setup({
     [HandActions.DEAL_CARDS]: ({ context }) => {
       dealCards(context);
     },
+
     [HandActions.PLAY_CARD]: ({ context, event }) => {
       if (event.type === HandEvents.PLAY_CARD) {
         playCard(context, event.playerId, event.card);
-        next(context, event.playerId);
-      }
-    },
-    [HandActions.END_HAND]: ({ context }) => {
-      endHand(context);
-    },
-    [HandActions.HANDLE_FORFEIT]: ({ context, event }) => {
-      if (event.type === HandEvents.FORFEIT) {
-        handleForfeit(context, event.playerId);
+        next(context);
       }
     },
 
-    [HandActions.UPDATE_TRUCO_POINTS]: ({ context, event }) => {
-      if (
-        event.type === HandEvents.TRUCO_ACCEPTED ||
-        event.type === HandEvents.TRUCO_DECLINED
-      ) {
-        updateTrucoPoints(context, event.points);
-      }
-    },
+    [HandActions.HANDLE_FORFEIT]: ({ context, event }) => ({
+      type: GameActions.UPDATE_GAME_POINTS,
+      points: getForfeitPoints(context),
+      playerId: context.currentTurn,
+    }),
+
+    [HandActions.ENVIDO_ACCEPTED]: sendParent(({ context, event }) => ({
+      type: GameActions.UPDATE_GAME_POINTS,
+      points: (event as { points: number }).points,
+      playerId: getEnvidoWinner(context),
+    })),
+
+    [HandActions.ENVIDO_DECLINED]: sendParent(({ context, event }) => ({
+      type: GameActions.UPDATE_GAME_POINTS,
+      points: (event as { points: number }).points,
+      playerId: context.currentTurn,
+    })),
+
+    [HandActions.TRUCO_ACCEPTED]: sendParent(({ context, event }) => ({
+      type: GameActions.UPDATE_GAME_POINTS,
+      points: (event as { points: number }).points,
+      playerId: getTrucoWinner(context),
+    })),
+
+    [HandActions.TRUCO_DECLINED]: sendParent(({ context, event }) => ({
+      type: GameActions.UPDATE_GAME_POINTS,
+      points: (event as { points: number }).points,
+      playerId: context.currentTurn,
+    })),
+
     [HandActions.RESET_HAND]: ({ context }) => {
       resetHand(context);
+    },
+    
+    [HandActions.CHANGE_TURN]: ({ context }) => {
+      next(context);
     },
   },
 });
