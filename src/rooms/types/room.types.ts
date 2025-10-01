@@ -4,11 +4,13 @@ export interface Room {
   players: string[];
   maxPlayers: number;
   betAmount: number;
+  scoreLimit: number;
 }
 
 export interface RoomOptions {
   maxPlayers: number;
   betAmount: number;
+  scoreLimit: number;
 }
 
 export interface Player {

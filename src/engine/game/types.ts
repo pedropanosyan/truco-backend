@@ -46,8 +46,9 @@ export type GameEventPayloads =
 export interface GameContext {
   players: Player[];
   scoreLimit: number;
-  scores: Record<Player['id'], number>;
+  scores: Score;
   id: string | null;
+  betAmount: number;
 }
 
 // ============================================================================
@@ -57,6 +58,8 @@ export interface GameContext {
 export interface GameInput {
   players: Player[];
   scoreLimit: number;
+  betAmount: number;
+  id: string;
 }
 
 // ============================================================================
@@ -68,3 +71,5 @@ export const GAME_RULES = {
   MIN_PLAYERS: 2,
   MAX_PLAYERS: 4,
 } as const;
+
+export type Score = Record<Player['id'], number>;

@@ -2,6 +2,8 @@
 // CARD TYPES
 // ============================================================================
 
+import { Score } from "../game/types";
+
 export enum Rank {
   ACE = 'ACE',
   TWO = 'TWO',
@@ -142,14 +144,19 @@ export type Player = {
   id: string;
 };
 
+export type CardPlay = {
+  playerId: string;
+  card: Card;
+};
+
 export interface HandContext {
   players: Player[];
   hands: Record<Player['id'], Hand>;
-  cardPlays: { playerId: string; card: Card }[];
+  cardPlays: CardPlay[];
   currentTurn: string;
   startingPlayer: string;
   scoreLimit: number;
-  currentScores: Record<Player['id'], number>;
+  currentScores: Score;
 }
 
 // ============================================================================
@@ -160,5 +167,5 @@ export interface HandInput {
   players: Player[];
   startingPlayer: string;
   scoreLimit: number;
-  currentScores: Record<Player['id'], number>;
+  currentScores: Score;
 }

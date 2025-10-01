@@ -4,6 +4,8 @@ import { RoomsService } from '../service/rooms.service';
 import { ServerToClientEvents } from '../types';
 import { CreateRoomDto, JoinRoomDto, LeaveRoomDto } from '../dto';
 import type { Socket, Server } from 'socket.io';
+import { RoomManager } from '../utils';
+import { GameService } from 'src/game';
 
 const createMockSocket = (id: string): Partial<Socket> => ({
   id,
@@ -25,7 +27,24 @@ describe('RoomsGateway', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [RoomsGateway, RoomsService],
+      providers: [
+        RoomsGateway,
+        RoomsService,
+        RoomManager,
+        {
+          provide: GameService,
+          useValue: {
+            startGame: jest.fn().mockReturnValue({
+              roomId: 'test-room',
+              players: ['player1', 'player2'],
+              betAmount: 10,
+              hands: { player1: [], player2: [] },
+              score: { player1: 0, player2: 0 },
+              scoreLimit: 30,
+            }),
+          },
+        },
+      ],
     }).compile();
 
     gateway = module.get<RoomsGateway>(RoomsGateway);
@@ -46,11 +65,7 @@ describe('RoomsGateway', () => {
 
       expect(mockSocket.emit).toHaveBeenCalledWith(
         ServerToClientEvents.CONNECTED,
-        {
-          message: 'Player connected',
-          socketId: 'test-socket-123',
-          rooms: [],
-        },
+        [],
       );
     });
   });
@@ -76,6 +91,7 @@ describe('RoomsGateway', () => {
         options: {
           maxPlayers: 4,
           betAmount: 10,
+          scoreLimit: 100,
         },
       };
 
@@ -95,6 +111,7 @@ describe('RoomsGateway', () => {
           players: ['player-123'],
           maxPlayers: 4,
           betAmount: 10,
+          scoreLimit: 100,
         }),
       );
     });
@@ -111,6 +128,7 @@ describe('RoomsGateway', () => {
         players: ['owner-123'],
         maxPlayers: 4,
         betAmount: 10,
+        scoreLimit: 100,
       });
 
       roomManager.sockets.set('test-socket-123', {
@@ -128,10 +146,14 @@ describe('RoomsGateway', () => {
 
       expect(mockServer.emit).toHaveBeenCalledWith(
         ServerToClientEvents.ROOM_UPDATED,
-        {
-          roomId: roomId,
+        expect.objectContaining({
+          id: roomId,
           players: ['owner-123', 'player-123'],
-        },
+          owner: 'owner-123',
+          maxPlayers: 4,
+          betAmount: 10,
+          scoreLimit: 100,
+        }),
       );
     });
   });
@@ -147,6 +169,7 @@ describe('RoomsGateway', () => {
         players: ['owner-123', 'player-123'],
         maxPlayers: 4,
         betAmount: 10,
+        scoreLimit: 100,
       });
 
       roomManager.sockets.set('test-socket-123', {
@@ -164,14 +187,18 @@ describe('RoomsGateway', () => {
 
       expect(mockServer.emit).toHaveBeenCalledWith(
         ServerToClientEvents.ROOM_UPDATED,
-        {
-          roomId: roomId,
+        expect.objectContaining({
+          id: roomId,
           players: ['owner-123'],
-        },
+          owner: 'owner-123',
+          maxPlayers: 4,
+          betAmount: 10,
+          scoreLimit: 100,
+        }),
       );
     });
 
-    it('should delete room and emit room updated event when owner leaves', () => {
+    it('should throw error when owner tries to leave room', () => {
       const roomManager = (service as any).roomManager;
       const roomId = 'test-room';
 
@@ -181,6 +208,7 @@ describe('RoomsGateway', () => {
         players: ['player-123'],
         maxPlayers: 4,
         betAmount: 10,
+        scoreLimit: 100,
       });
 
       roomManager.sockets.set('test-socket-123', {
@@ -196,9 +224,87 @@ describe('RoomsGateway', () => {
 
       gateway.handleLeaveRoom(mockSocket as Socket, leaveRoomDto);
 
+      expect(mockSocket.emit).toHaveBeenCalledWith(
+        ServerToClientEvents.ERROR,
+        expect.objectContaining({
+          message: expect.stringContaining(
+            'leave room (owners must delete room instead)',
+          ),
+          type: 'UnauthorizedRoomActionException',
+          socketId: 'test-socket-123',
+        }),
+      );
+    });
+  });
+
+  describe('handleDeleteRoom', () => {
+    it('should delete room and emit room deleted event when owner requests it', () => {
+      const roomManager = (service as any).roomManager;
+      const roomId = 'test-room';
+
+      roomManager.rooms.set(roomId, {
+        id: roomId,
+        owner: 'player-123',
+        players: ['player-123'],
+        maxPlayers: 4,
+        betAmount: 10,
+        scoreLimit: 100,
+      });
+
+      roomManager.sockets.set('test-socket-123', {
+        socketId: 'test-socket-123',
+        playerId: 'player-123',
+        roomId: roomId,
+      });
+
+      const deleteRoomDto: LeaveRoomDto = {
+        roomId: roomId,
+        playerId: 'player-123',
+      };
+
+      gateway.handleDeleteRoom(mockSocket as Socket, deleteRoomDto);
+
       expect(mockServer.emit).toHaveBeenCalledWith(
-        ServerToClientEvents.ROOM_UPDATED,
+        ServerToClientEvents.ROOM_DELETED,
         { roomId: roomId },
+      );
+    });
+
+    it('should throw error when non-owner tries to delete room', () => {
+      const roomManager = (service as any).roomManager;
+      const roomId = 'test-room';
+
+      roomManager.rooms.set(roomId, {
+        id: roomId,
+        owner: 'owner-123',
+        players: ['owner-123', 'player-123'],
+        maxPlayers: 4,
+        betAmount: 10,
+        scoreLimit: 100,
+      });
+
+      roomManager.sockets.set('test-socket-123', {
+        socketId: 'test-socket-123',
+        playerId: 'player-123',
+        roomId: roomId,
+      });
+
+      const deleteRoomDto: LeaveRoomDto = {
+        roomId: roomId,
+        playerId: 'player-123',
+      };
+
+      gateway.handleDeleteRoom(mockSocket as Socket, deleteRoomDto);
+
+      expect(mockSocket.emit).toHaveBeenCalledWith(
+        ServerToClientEvents.ERROR,
+        expect.objectContaining({
+          message: expect.stringContaining(
+            'delete room (only room owners can delete rooms)',
+          ),
+          type: 'UnauthorizedRoomActionException',
+          socketId: 'test-socket-123',
+        }),
       );
     });
   });

@@ -47,3 +47,9 @@ export class RoomAlreadyStartedException extends WsException {
     super(`Room has already started and cannot be modified`);
   }
 }
+
+export class PlayerAlreadyRegisteredException extends WsException {
+  constructor() {
+    super(`Player has already registered`);
+  }
+}

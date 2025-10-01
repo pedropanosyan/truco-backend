@@ -5,6 +5,7 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
   WebSocketServer,
+  ConnectedSocket,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
 import { RoomsService } from '../service/rooms.service';
@@ -13,13 +14,18 @@ import {
   type JoinRoomDto,
   type CreateRoomDto,
   type LeaveRoomDto,
+  type StartGameDto,
+  type RegisterPlayerDto,
+  type DeleteRoomDto,
 } from '../dto';
+import { UsePipes, ValidationPipe } from '@nestjs/common';
 
 @WebSocketGateway({
   cors: {
     origin: '*',
   },
 })
+@UsePipes(new ValidationPipe({ transform: true }))
 export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(private readonly roomsService: RoomsService) {}
 
@@ -40,21 +46,112 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
   }
 
+  @SubscribeMessage(ClientToServerEvents.REGISTER_PLAYER)
+  handleRegisterPlayer(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: RegisterPlayerDto,
+  ): void {
+    try {
+      this.roomsService.handleRegisterPlayer(client.id, data);
+      this.server.emit(
+        ServerToClientEvents.ROOMS,
+        this.roomsService.handleGetAllRooms(),
+      );
+    } catch (error) {
+      client.emit(ServerToClientEvents.ERROR, {
+        message: error.message,
+        type: error.constructor.name,
+        socketId: client.id,
+      });
+    }
+  }
+
   @SubscribeMessage(ClientToServerEvents.CREATE_ROOM)
-  handleCreateRoom(client: Socket, @MessageBody() data: CreateRoomDto): void {
-    const response = this.roomsService.handleCreateRoom(client.id, data);
-    this.server.emit(ServerToClientEvents.ROOM_CREATED, response);
+  handleCreateRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: CreateRoomDto,
+  ): void {
+    try {
+      const response = this.roomsService.handleCreateRoom(client.id, data);
+      this.server.emit(ServerToClientEvents.ROOM_CREATED, response);
+    } catch (error) {
+      client.emit(ServerToClientEvents.ERROR, {
+        message: error.message,
+        type: error.constructor.name,
+        socketId: client.id,
+      });
+    }
   }
 
   @SubscribeMessage(ClientToServerEvents.JOIN_ROOM)
-  handleJoinRoom(client: Socket, @MessageBody() data: JoinRoomDto): void {
-    const response = this.roomsService.handleJoinRoom(client.id, data);
-    this.server.emit(ServerToClientEvents.ROOM_UPDATED, response);
+  handleJoinRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: JoinRoomDto,
+  ): void {
+    try {
+      const response = this.roomsService.handleJoinRoom(client.id, data);
+      this.server.emit(ServerToClientEvents.ROOM_UPDATED, response);
+    } catch (error) {
+      client.emit(ServerToClientEvents.ERROR, {
+        message: error.message,
+        type: error.constructor.name,
+        socketId: client.id,
+      });
+    }
   }
 
   @SubscribeMessage(ClientToServerEvents.LEAVE_ROOM)
-  handleLeaveRoom(client: Socket, @MessageBody() data: LeaveRoomDto): void {
-    const response = this.roomsService.handleLeaveRoom(client.id, data);
-    this.server.emit(ServerToClientEvents.ROOM_UPDATED, response);
+  handleLeaveRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: LeaveRoomDto,
+  ): void {
+    try {
+      this.server.emit(
+        ServerToClientEvents.ROOM_UPDATED,
+        this.roomsService.handleLeaveRoom(client.id, data),
+      );
+    } catch (error) {
+      client.emit(ServerToClientEvents.ERROR, {
+        message: error.message,
+        type: error.constructor.name,
+        socketId: client.id,
+      });
+    }
+  }
+
+  @SubscribeMessage(ClientToServerEvents.DELETE_ROOM)
+  handleDeleteRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: DeleteRoomDto,
+  ): void {
+    try {
+      this.server.emit(
+        ServerToClientEvents.ROOM_DELETED,
+        this.roomsService.handleDeleteRoom(client.id, data).roomId,
+      );
+    } catch (error) {
+      client.emit(ServerToClientEvents.ERROR, {
+        message: error.message,
+        type: error.constructor.name,
+        socketId: client.id,
+      });
+    }
+  }
+
+  @SubscribeMessage(ClientToServerEvents.START_GAME)
+  handleStartGame(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: StartGameDto,
+  ): void {
+    try {
+      const response = this.roomsService.handleStartGame(client.id, data);
+      this.server.emit(ServerToClientEvents.GAME_STARTING, response);
+    } catch (error) {
+      client.emit(ServerToClientEvents.ERROR, {
+        message: error.message,
+        type: error.constructor.name,
+        socketId: client.id,
+      });
+    }
   }
 }

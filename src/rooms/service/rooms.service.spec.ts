@@ -1,599 +1,567 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RoomsService } from './rooms.service';
+import { RoomManager } from '../utils';
+import { GameService } from 'src/game';
 import {
-  ConnectedResponse,
-  DisconnectedResponse,
   CreateRoomDto,
   JoinRoomDto,
   LeaveRoomDto,
+  RegisterPlayerDto,
+  StartGameDto,
 } from '../dto';
 import {
-  PlayerNotFoundException,
   PlayerAlreadyInRoomException,
+  PlayerNotFoundException,
   PlayerNotInRoomException,
-  RoomNotFoundException,
   RoomFullException,
+  RoomNotFoundException,
+  UnauthorizedRoomActionException,
 } from '../exceptions';
 
 describe('RoomsService', () => {
   let service: RoomsService;
+  let roomManager: RoomManager;
+  let gameService: GameService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [RoomsService],
+      providers: [
+        RoomsService,
+        RoomManager,
+        {
+          provide: GameService,
+          useValue: {
+            startGame: jest.fn().mockReturnValue({
+              roomId: 'test-room',
+              players: ['player1', 'player2'],
+              betAmount: 10,
+              hands: { player1: [], player2: [] },
+              score: { player1: 0, player2: 0 },
+              scoreLimit: 30,
+            }),
+          },
+        },
+      ],
     }).compile();
 
     service = module.get<RoomsService>(RoomsService);
-  });
-
-  const getRoomManager = () => (service as any).roomManager;
-
-  const clearRoomManager = () => {
-    const roomManager = getRoomManager();
-    roomManager.rooms.clear();
-    roomManager.sockets.clear();
-  };
-
-  const createMockPlayer = (
-    socketId: string,
-    playerId: string,
-    roomId: string | null = null,
-  ) => ({
-    socketId,
-    playerId,
-    roomId,
-  });
-
-  const createMockRoom = (overrides: Partial<any> = {}) => ({
-    id: 'test-room',
-    owner: 'owner-123',
-    players: ['owner-123'],
-    maxPlayers: 4,
-    betAmount: 10,
-    ...overrides,
-  });
-
-  const createCreateRoomDto = (
-    overrides: Partial<CreateRoomDto> = {},
-  ): CreateRoomDto => ({
-    playerId: 'player-123',
-    options: {
-      maxPlayers: 4,
-      betAmount: 10,
-    },
-    ...overrides,
-  });
-
-  const createJoinRoomDto = (
-    overrides: Partial<JoinRoomDto> = {},
-  ): JoinRoomDto => ({
-    playerId: 'player-123',
-    roomId: 'test-room',
-    ...overrides,
-  });
-
-  const createLeaveRoomDto = (
-    overrides: Partial<LeaveRoomDto> = {},
-  ): LeaveRoomDto => ({
-    roomId: 'test-room',
-    playerId: 'player-123',
-    ...overrides,
-  });
-
-  const setupPlayerInRoom = (
-    socketId: string,
-    playerId: string,
-    roomId: string,
-  ) => {
-    const roomManager = getRoomManager();
-    roomManager.sockets.set(
-      socketId,
-      createMockPlayer(socketId, playerId, roomId),
-    );
-  };
-
-  const setupRoom = (room: any) => {
-    const roomManager = getRoomManager();
-    roomManager.rooms.set(room.id, room);
-  };
-
-  const expectDisconnectedResponse = (
-    result: DisconnectedResponse,
-    socketId: string,
-  ) => {
-    expect(result).toEqual({
-      message: 'Player disconnected',
-      socketId,
-    });
-  };
-
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+    roomManager = module.get<RoomManager>(RoomManager);
+    gameService = module.get<GameService>(GameService);
   });
 
   describe('handleConnection', () => {
-    it('should return a connected response with the provided socket ID', () => {
-      const socketId = 'test-socket-123';
-
-      const result: ConnectedResponse = service.handleConnection(socketId);
-
-      expect(result).toEqual({
-        message: 'Player connected',
-        socketId: socketId,
-        rooms: [],
-      });
+    it('should return all rooms', () => {
+      const rooms = service.handleConnection('test-socket');
+      expect(Array.isArray(rooms)).toBe(true);
     });
   });
 
-  describe('handleDisconnect', () => {
-    beforeEach(clearRoomManager);
-
-    it('should gracefully handle disconnect when socket ID is not found', () => {
-      const socketId = 'non-existent-socket';
-      const result = service.handleDisconnect(socketId);
-      expectDisconnectedResponse(result, socketId);
-    });
-
-    it('should gracefully handle disconnect when player has no room', () => {
+  describe('handleRegisterPlayer', () => {
+    it('should register a new player', () => {
       const socketId = 'test-socket';
-      const playerId = 'player-123';
-      const roomManager = getRoomManager();
+      const data: RegisterPlayerDto = { playerId: 'player-123' };
 
-      roomManager.sockets.set(socketId, createMockPlayer(socketId, playerId));
+      service.handleRegisterPlayer(socketId, data);
 
-      const result = service.handleDisconnect(socketId);
-
-      expectDisconnectedResponse(result, socketId);
-      expect(roomManager.sockets.has(socketId)).toBe(false);
-    });
-
-    it('should gracefully handle disconnect when room no longer exists', () => {
-      const socketId = 'test-socket';
-      const playerId = 'player-123';
-      const roomId = 'non-existent-room';
-      const roomManager = getRoomManager();
-
-      roomManager.sockets.set(
+      const player = roomManager.getPlayer(socketId);
+      expect(player).toEqual({
         socketId,
-        createMockPlayer(socketId, playerId, roomId),
-      );
-
-      const result = service.handleDisconnect(socketId);
-
-      expectDisconnectedResponse(result, socketId);
-      expect(roomManager.sockets.has(socketId)).toBe(false);
+        playerId: 'player-123',
+        roomId: null,
+      });
     });
 
-    it('should successfully disconnect player and remove room when player is owner', () => {
+    it('should throw error if player already exists', () => {
       const socketId = 'test-socket';
-      const playerId = 'player-123';
-      const roomId = 'test-room';
-      const roomManager = getRoomManager();
+      const data: RegisterPlayerDto = { playerId: 'player-123' };
 
-      setupPlayerInRoom(socketId, playerId, roomId);
-      setupRoom(
-        createMockRoom({
-          id: roomId,
-          owner: playerId,
-          players: [playerId],
-        }),
-      );
+      // Register player first time
+      service.handleRegisterPlayer(socketId, data);
 
-      const result = service.handleDisconnect(socketId);
-
-      expectDisconnectedResponse(result, socketId);
-      expect(roomManager.rooms.has(roomId)).toBe(false);
-      expect(roomManager.sockets.has(socketId)).toBe(false);
-    });
-
-    it('should successfully disconnect player and remove from room when player is not owner', () => {
-      const socketId = 'test-socket';
-      const playerId = 'player-123';
-      const ownerId = 'owner-456';
-      const roomId = 'test-room';
-      const roomManager = getRoomManager();
-
-      setupPlayerInRoom(socketId, playerId, roomId);
-      setupRoom(
-        createMockRoom({
-          id: roomId,
-          owner: ownerId,
-          players: [ownerId, playerId],
-        }),
-      );
-
-      const result = service.handleDisconnect(socketId);
-
-      expectDisconnectedResponse(result, socketId);
-      expect(roomManager.rooms.has(roomId)).toBe(true);
-
-      const room = roomManager.rooms.get(roomId);
-      expect(room.players).toEqual([ownerId]);
-      expect(room.players).not.toContain(playerId);
-      expect(roomManager.sockets.has(socketId)).toBe(false);
+      // Try to register again
+      expect(() => {
+        service.handleRegisterPlayer(socketId, data);
+      }).toThrow(PlayerAlreadyInRoomException);
     });
   });
 
   describe('handleCreateRoom', () => {
-    beforeEach(clearRoomManager);
-
-    const testCases = [
-      {
-        description:
-          'should throw PlayerNotFoundException when player does not exist',
-        setup: () => ({}),
-        socketId: 'non-existent-socket',
-        data: createCreateRoomDto(),
-        expectedError: PlayerNotFoundException,
-      },
-      {
-        description:
-          'should throw PlayerNotFoundException when player ID does not match',
-        setup: () => {
-          const roomManager = getRoomManager();
-          roomManager.sockets.set(
-            'test-socket',
-            createMockPlayer('test-socket', 'player-123'),
-          );
-          return {};
-        },
-        socketId: 'test-socket',
-        data: createCreateRoomDto({ playerId: 'different-player-456' }),
-        expectedError: PlayerNotFoundException,
-      },
-      {
-        description:
-          'should throw PlayerAlreadyInRoomException when player is already in a room',
-        setup: () => {
-          const roomManager = getRoomManager();
-          roomManager.sockets.set(
-            'test-socket',
-            createMockPlayer('test-socket', 'player-123', 'existing-room'),
-          );
-          return {};
-        },
-        socketId: 'test-socket',
-        data: createCreateRoomDto(),
-        expectedError: PlayerAlreadyInRoomException,
-      },
-    ];
-
-    testCases.forEach(
-      ({ description, setup, socketId, data, expectedError }) => {
-        it(description, () => {
-          setup();
-          expect(() => service.handleCreateRoom(socketId, data)).toThrow(
-            expectedError,
-          );
-        });
-      },
-    );
-
-    it('should successfully create a room when all conditions are met', () => {
+    it('should create a room and add owner as first player', () => {
       const socketId = 'test-socket';
       const playerId = 'player-123';
-      const roomManager = getRoomManager();
 
-      roomManager.sockets.set(socketId, createMockPlayer(socketId, playerId));
+      // Register player first
+      service.handleRegisterPlayer(socketId, { playerId });
 
-      const createRoomData = createCreateRoomDto({
+      const data: CreateRoomDto = {
         playerId,
-        options: { maxPlayers: 6, betAmount: 25 },
-      });
+        options: {
+          maxPlayers: 4,
+          betAmount: 10,
+          scoreLimit: 100,
+        },
+      };
 
-      const result = service.handleCreateRoom(socketId, createRoomData);
+      const result = service.handleCreateRoom(socketId, data);
 
       expect(result).toMatchObject({
         owner: playerId,
         players: [playerId],
-        maxPlayers: 6,
-        betAmount: 25,
+        maxPlayers: 4,
+        betAmount: 10,
+        scoreLimit: 100,
       });
       expect(result.id).toBeDefined();
-      expect(roomManager.rooms.has(result.id)).toBe(true);
 
-      const room = roomManager.rooms.get(result.id);
-      expect(room).toEqual(result);
+      // Verify player is associated with room
+      const player = roomManager.getPlayer(socketId);
+      expect(player?.roomId).toBe(result.id);
+    });
 
-      const updatedPlayer = roomManager.sockets.get(socketId);
-      expect(updatedPlayer.roomId).toBe(result.id);
+    it('should throw error if player not found', () => {
+      const data: CreateRoomDto = {
+        playerId: 'player-123',
+        options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
+      };
+
+      expect(() => {
+        service.handleCreateRoom('test-socket', data);
+      }).toThrow(PlayerNotFoundException);
+    });
+
+    it('should throw error if player already in room', () => {
+      const socketId = 'test-socket';
+      const playerId = 'player-123';
+
+      // Register player and create room
+      service.handleRegisterPlayer(socketId, { playerId });
+      service.handleCreateRoom(socketId, {
+        playerId,
+        options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
+      });
+
+      // Try to create another room
+      expect(() => {
+        service.handleCreateRoom(socketId, {
+          playerId,
+          options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
+        });
+      }).toThrow(PlayerAlreadyInRoomException);
     });
   });
 
   describe('handleJoinRoom', () => {
-    beforeEach(clearRoomManager);
-
-    const joinRoomTestCases = [
-      {
-        description:
-          'should throw PlayerNotFoundException when player does not exist',
-        setup: () => ({}),
-        socketId: 'non-existent-socket',
-        data: createJoinRoomDto(),
-        expectedError: PlayerNotFoundException,
-      },
-      {
-        description:
-          'should throw PlayerNotFoundException when player ID does not match',
-        setup: () => {
-          const roomManager = getRoomManager();
-          roomManager.sockets.set(
-            'test-socket',
-            createMockPlayer('test-socket', 'player-123'),
-          );
-          return {};
-        },
-        socketId: 'test-socket',
-        data: createJoinRoomDto({ playerId: 'different-player-456' }),
-        expectedError: PlayerNotFoundException,
-      },
-      {
-        description:
-          'should throw PlayerAlreadyInRoomException when player is already in a room',
-        setup: () => {
-          const roomManager = getRoomManager();
-          roomManager.sockets.set(
-            'test-socket',
-            createMockPlayer('test-socket', 'player-123', 'existing-room'),
-          );
-          return {};
-        },
-        socketId: 'test-socket',
-        data: createJoinRoomDto({ roomId: 'different-room' }),
-        expectedError: PlayerAlreadyInRoomException,
-      },
-      {
-        description:
-          'should throw RoomNotFoundException when room does not exist',
-        setup: () => {
-          const roomManager = getRoomManager();
-          roomManager.sockets.set(
-            'test-socket',
-            createMockPlayer('test-socket', 'player-123'),
-          );
-          return {};
-        },
-        socketId: 'test-socket',
-        data: createJoinRoomDto({ roomId: 'non-existent-room' }),
-        expectedError: RoomNotFoundException,
-      },
-      {
-        description: 'should throw RoomFullException when room is full',
-        setup: () => {
-          const roomManager = getRoomManager();
-          roomManager.sockets.set(
-            'test-socket',
-            createMockPlayer('test-socket', 'player-123'),
-          );
-          setupRoom(
-            createMockRoom({
-              players: ['owner-456', 'other-player'],
-              maxPlayers: 2,
-            }),
-          );
-          return {};
-        },
-        socketId: 'test-socket',
-        data: createJoinRoomDto(),
-        expectedError: RoomFullException,
-      },
-    ];
-
-    joinRoomTestCases.forEach(
-      ({ description, setup, socketId, data, expectedError }) => {
-        it(description, () => {
-          setup();
-          expect(() => service.handleJoinRoom(socketId, data)).toThrow(
-            expectedError,
-          );
-        });
-      },
-    );
-
-    it('should successfully join a room when all conditions are met', () => {
-      const socketId = 'test-socket';
+    it('should successfully join a room', () => {
+      const ownerSocketId = 'owner-socket';
+      const playerSocketId = 'player-socket';
+      const ownerId = 'owner-123';
       const playerId = 'player-123';
-      const ownerId = 'owner-456';
-      const roomId = 'test-room';
-      const roomManager = getRoomManager();
 
-      roomManager.sockets.set(socketId, createMockPlayer(socketId, playerId));
-      setupRoom(
-        createMockRoom({
-          id: roomId,
-          owner: ownerId,
-          players: [ownerId],
-        }),
-      );
-
-      const result = service.handleJoinRoom(
-        socketId,
-        createJoinRoomDto({
-          playerId,
-          roomId,
-        }),
-      );
-
-      expect(result).toEqual({
-        roomId,
-        players: [ownerId, playerId],
+      // Setup owner and room
+      service.handleRegisterPlayer(ownerSocketId, { playerId: ownerId });
+      const room = service.handleCreateRoom(ownerSocketId, {
+        playerId: ownerId,
+        options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
       });
 
-      const updatedPlayer = roomManager.sockets.get(socketId);
-      expect(updatedPlayer.roomId).toBe(roomId);
+      // Register joining player
+      service.handleRegisterPlayer(playerSocketId, { playerId });
 
-      const updatedRoom = roomManager.rooms.get(roomId);
-      expect(updatedRoom.players).toEqual([ownerId, playerId]);
+      const data: JoinRoomDto = {
+        playerId,
+        roomId: room.id,
+      };
+
+      const result = service.handleJoinRoom(playerSocketId, data);
+
+      expect(result).toMatchObject({
+        id: room.id,
+        players: [ownerId, playerId],
+        owner: ownerId,
+      });
+
+      // Verify player is associated with room
+      const player = roomManager.getPlayer(playerSocketId);
+      expect(player?.roomId).toBe(room.id);
+    });
+
+    it('should throw error if player not found', () => {
+      const data: JoinRoomDto = {
+        playerId: 'player-123',
+        roomId: 'test-room',
+      };
+
+      expect(() => {
+        service.handleJoinRoom('test-socket', data);
+      }).toThrow(PlayerNotFoundException);
+    });
+
+    it('should throw error if player already in room', () => {
+      const socketId = 'test-socket';
+      const playerId = 'player-123';
+
+      // Register player and create room
+      service.handleRegisterPlayer(socketId, { playerId });
+      const room = service.handleCreateRoom(socketId, {
+        playerId,
+        options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
+      });
+
+      // Try to join another room
+      expect(() => {
+        service.handleJoinRoom(socketId, {
+          playerId,
+          roomId: 'other-room',
+        });
+      }).toThrow(PlayerAlreadyInRoomException);
+    });
+
+    it('should throw error if room not found', () => {
+      const socketId = 'test-socket';
+      const playerId = 'player-123';
+
+      service.handleRegisterPlayer(socketId, { playerId });
+
+      expect(() => {
+        service.handleJoinRoom(socketId, {
+          playerId,
+          roomId: 'non-existent-room',
+        });
+      }).toThrow(RoomNotFoundException);
+    });
+
+    it('should throw error if room is full', () => {
+      const ownerSocketId = 'owner-socket';
+      const ownerId = 'owner-123';
+
+      // Create room with max 2 players
+      service.handleRegisterPlayer(ownerSocketId, { playerId: ownerId });
+      const room = service.handleCreateRoom(ownerSocketId, {
+        playerId: ownerId,
+        options: { maxPlayers: 2, betAmount: 10, scoreLimit: 100 },
+      });
+
+      // Add one more player
+      const player1SocketId = 'player1-socket';
+      const player1Id = 'player1-123';
+      service.handleRegisterPlayer(player1SocketId, { playerId: player1Id });
+      service.handleJoinRoom(player1SocketId, {
+        playerId: player1Id,
+        roomId: room.id,
+      });
+
+      // Try to add second player (room should be full)
+      const player2SocketId = 'player2-socket';
+      const player2Id = 'player2-123';
+      service.handleRegisterPlayer(player2SocketId, { playerId: player2Id });
+
+      expect(() => {
+        service.handleJoinRoom(player2SocketId, {
+          playerId: player2Id,
+          roomId: room.id,
+        });
+      }).toThrow(RoomFullException);
     });
   });
 
   describe('handleLeaveRoom', () => {
-    beforeEach(clearRoomManager);
-
-    const leaveRoomTestCases = [
-      {
-        description:
-          'should throw PlayerNotFoundException when player does not exist',
-        setup: () => ({}),
-        socketId: 'non-existent-socket',
-        data: createLeaveRoomDto(),
-        expectedError: PlayerNotFoundException,
-      },
-      {
-        description:
-          'should throw PlayerNotFoundException when player ID does not match',
-        setup: () => {
-          const roomManager = getRoomManager();
-          roomManager.sockets.set(
-            'test-socket',
-            createMockPlayer('test-socket', 'player-123', 'some-room'),
-          );
-          return {};
-        },
-        socketId: 'test-socket',
-        data: createLeaveRoomDto({ playerId: 'different-player-456' }),
-        expectedError: PlayerNotFoundException,
-      },
-      {
-        description:
-          'should throw PlayerNotInRoomException when player is not in a room',
-        setup: () => {
-          const roomManager = getRoomManager();
-          roomManager.sockets.set(
-            'test-socket',
-            createMockPlayer('test-socket', 'player-123'),
-          );
-          return {};
-        },
-        socketId: 'test-socket',
-        data: createLeaveRoomDto(),
-        expectedError: PlayerNotInRoomException,
-      },
-      {
-        description:
-          'should throw RoomNotFoundException when room does not exist',
-        setup: () => {
-          const roomManager = getRoomManager();
-          roomManager.sockets.set(
-            'test-socket',
-            createMockPlayer('test-socket', 'player-123', 'non-existent-room'),
-          );
-          return {};
-        },
-        socketId: 'test-socket',
-        data: createLeaveRoomDto(),
-        expectedError: RoomNotFoundException,
-      },
-    ];
-
-    leaveRoomTestCases.forEach(
-      ({ description, setup, socketId, data, expectedError }) => {
-        it(description, () => {
-          setup();
-          expect(() => service.handleLeaveRoom(socketId, data)).toThrow(
-            expectedError,
-          );
-        });
-      },
-    );
-
-    it('should delete room and return DeleteRoomResponse when player is the room owner', () => {
-      const socketId = 'test-socket';
+    it('should leave room and return updated room when not owner', () => {
+      const ownerSocketId = 'owner-socket';
+      const playerSocketId = 'player-socket';
+      const ownerId = 'owner-123';
       const playerId = 'player-123';
-      const roomId = 'test-room';
-      const roomManager = getRoomManager();
 
-      setupPlayerInRoom(socketId, playerId, roomId);
-      setupRoom(
-        createMockRoom({
-          id: roomId,
-          owner: playerId,
-          players: [playerId],
-        }),
-      );
-
-      const result = service.handleLeaveRoom(
-        socketId,
-        createLeaveRoomDto({
-          roomId,
-          playerId,
-        }),
-      );
-
-      expect(result).toEqual({ roomId });
-      expect(roomManager.rooms.has(roomId)).toBe(false);
-    });
-
-    it('should remove player from room and return LeaveRoomResponse when player is not the owner', () => {
-      const socketId = 'test-socket';
-      const playerId = 'player-123';
-      const ownerId = 'owner-456';
-      const otherPlayerId = 'other-789';
-      const roomId = 'test-room';
-      const roomManager = getRoomManager();
-
-      setupPlayerInRoom(socketId, playerId, roomId);
-      setupRoom(
-        createMockRoom({
-          id: roomId,
-          owner: ownerId,
-          players: [ownerId, playerId, otherPlayerId],
-        }),
-      );
-
-      const result = service.handleLeaveRoom(
-        socketId,
-        createLeaveRoomDto({
-          roomId,
-          playerId,
-        }),
-      );
-
-      expect(result).toEqual({
-        roomId,
-        players: [ownerId, otherPlayerId],
+      // Setup room with two players
+      service.handleRegisterPlayer(ownerSocketId, { playerId: ownerId });
+      const room = service.handleCreateRoom(ownerSocketId, {
+        playerId: ownerId,
+        options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
       });
 
-      expect(roomManager.rooms.has(roomId)).toBe(true);
+      service.handleRegisterPlayer(playerSocketId, { playerId });
+      service.handleJoinRoom(playerSocketId, {
+        playerId,
+        roomId: room.id,
+      });
 
-      const updatedRoom = roomManager.rooms.get(roomId);
-      expect(updatedRoom.players).toEqual([ownerId, otherPlayerId]);
-      expect(updatedRoom.players).not.toContain(playerId);
-    });
+      const data: LeaveRoomDto = {
+        playerId,
+        roomId: room.id,
+      };
 
-    it('should handle leaving room with only owner and one other player', () => {
-      const socketId = 'test-socket';
-      const playerId = 'player-123';
-      const ownerId = 'owner-456';
-      const roomId = 'test-room';
-      const roomManager = getRoomManager();
+      const result = service.handleLeaveRoom(playerSocketId, data);
 
-      setupPlayerInRoom(socketId, playerId, roomId);
-      setupRoom(
-        createMockRoom({
-          id: roomId,
-          owner: ownerId,
-          players: [ownerId, playerId],
-        }),
-      );
-
-      const result = service.handleLeaveRoom(
-        socketId,
-        createLeaveRoomDto({
-          roomId,
-          playerId,
-        }),
-      );
-
-      expect(result).toEqual({
-        roomId,
+      expect(result).toMatchObject({
+        roomId: room.id,
         players: [ownerId],
       });
 
-      expect(roomManager.rooms.has(roomId)).toBe(true);
+      // Verify player is no longer in room
+      const player = roomManager.getPlayer(playerSocketId);
+      expect(player?.roomId).toBeNull();
+    });
 
-      const updatedRoom = roomManager.rooms.get(roomId);
-      expect(updatedRoom.players).toEqual([ownerId]);
+    it('should throw error if owner tries to leave room', () => {
+      const socketId = 'test-socket';
+      const playerId = 'player-123';
+
+      // Create room
+      service.handleRegisterPlayer(socketId, { playerId });
+      const room = service.handleCreateRoom(socketId, {
+        playerId,
+        options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
+      });
+
+      const data: LeaveRoomDto = {
+        playerId,
+        roomId: room.id,
+      };
+
+      expect(() => {
+        service.handleLeaveRoom(socketId, data);
+      }).toThrow(UnauthorizedRoomActionException);
+    });
+
+    it('should throw error if player not found', () => {
+      const data: LeaveRoomDto = {
+        playerId: 'player-123',
+        roomId: 'test-room',
+      };
+
+      expect(() => {
+        service.handleLeaveRoom('test-socket', data);
+      }).toThrow(PlayerNotFoundException);
+    });
+
+    it('should throw error if player not in room', () => {
+      const socketId = 'test-socket';
+      const playerId = 'player-123';
+
+      service.handleRegisterPlayer(socketId, { playerId });
+
+      expect(() => {
+        service.handleLeaveRoom(socketId, {
+          playerId,
+          roomId: 'test-room',
+        });
+      }).toThrow(PlayerNotInRoomException);
+    });
+  });
+
+  describe('handleDeleteRoom', () => {
+    it('should delete room when owner requests it', () => {
+      const socketId = 'test-socket';
+      const playerId = 'player-123';
+
+      // Create room
+      service.handleRegisterPlayer(socketId, { playerId });
+      const room = service.handleCreateRoom(socketId, {
+        playerId,
+        options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
+      });
+
+      const data: LeaveRoomDto = {
+        playerId,
+        roomId: room.id,
+      };
+
+      const result = service.handleDeleteRoom(socketId, data);
+
+      expect(result).toEqual({ roomId: room.id });
+
+      // Verify room no longer exists
+      const roomAfterDelete = roomManager.getRoom(room.id);
+      expect(roomAfterDelete).toBeUndefined();
+
+      // Verify player is no longer in room
+      const player = roomManager.getPlayer(socketId);
+      expect(player?.roomId).toBeNull();
+    });
+
+    it('should throw error if non-owner tries to delete room', () => {
+      const ownerSocketId = 'owner-socket';
+      const playerSocketId = 'player-socket';
+      const ownerId = 'owner-123';
+      const playerId = 'player-123';
+
+      // Setup room with two players
+      service.handleRegisterPlayer(ownerSocketId, { playerId: ownerId });
+      const room = service.handleCreateRoom(ownerSocketId, {
+        playerId: ownerId,
+        options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
+      });
+
+      service.handleRegisterPlayer(playerSocketId, { playerId });
+      service.handleJoinRoom(playerSocketId, {
+        playerId,
+        roomId: room.id,
+      });
+
+      const data: LeaveRoomDto = {
+        playerId,
+        roomId: room.id,
+      };
+
+      expect(() => {
+        service.handleDeleteRoom(playerSocketId, data);
+      }).toThrow(UnauthorizedRoomActionException);
+    });
+
+    it('should throw error if player not found', () => {
+      const data: LeaveRoomDto = {
+        playerId: 'player-123',
+        roomId: 'test-room',
+      };
+
+      expect(() => {
+        service.handleDeleteRoom('test-socket', data);
+      }).toThrow(PlayerNotFoundException);
+    });
+
+    it('should throw error if player not in room', () => {
+      const socketId = 'test-socket';
+      const playerId = 'player-123';
+
+      service.handleRegisterPlayer(socketId, { playerId });
+
+      expect(() => {
+        service.handleDeleteRoom(socketId, {
+          playerId,
+          roomId: 'test-room',
+        });
+      }).toThrow(PlayerNotInRoomException);
+    });
+  });
+
+  describe('handleStartGame', () => {
+    it('should start game when owner requests it', () => {
+      const socketId = 'test-socket';
+      const playerId = 'player-123';
+
+      // Create room
+      service.handleRegisterPlayer(socketId, { playerId });
+      const room = service.handleCreateRoom(socketId, {
+        playerId,
+        options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
+      });
+
+      const data: StartGameDto = {
+        playerId,
+        roomId: room.id,
+      };
+
+      const result = service.handleStartGame(socketId, data);
+
+      expect(result).toHaveProperty('gameState');
+      expect(gameService.startGame).toHaveBeenCalledWith({
+        roomId: room.id,
+        players: [playerId],
+        betAmount: 10,
+        scoreLimit: 100,
+      });
+    });
+
+    it('should throw error if not owner', () => {
+      const ownerSocketId = 'owner-socket';
+      const playerSocketId = 'player-socket';
+      const ownerId = 'owner-123';
+      const playerId = 'player-123';
+
+      // Create room
+      service.handleRegisterPlayer(ownerSocketId, { playerId: ownerId });
+      const room = service.handleCreateRoom(ownerSocketId, {
+        playerId: ownerId,
+        options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
+      });
+
+      // Add another player
+      service.handleRegisterPlayer(playerSocketId, { playerId });
+      service.handleJoinRoom(playerSocketId, {
+        playerId,
+        roomId: room.id,
+      });
+
+      expect(() => {
+        service.handleStartGame(playerSocketId, {
+          playerId,
+          roomId: room.id,
+        });
+      }).toThrow(UnauthorizedRoomActionException);
+    });
+  });
+
+  describe('handleDisconnect', () => {
+    it('should handle disconnect gracefully when player not in room', () => {
+      const socketId = 'test-socket';
+      const playerId = 'player-123';
+
+      service.handleRegisterPlayer(socketId, { playerId });
+
+      const result = service.handleDisconnect(socketId);
+
+      expect(result).toEqual({
+        message: 'Player disconnected',
+        socketId,
+      });
+
+      // Verify player is removed
+      const player = roomManager.getPlayer(socketId);
+      expect(player).toBeUndefined();
+    });
+
+    it('should remove player from room and delete room when owner disconnects', () => {
+      const socketId = 'test-socket';
+      const playerId = 'player-123';
+
+      // Create room
+      service.handleRegisterPlayer(socketId, { playerId });
+      const room = service.handleCreateRoom(socketId, {
+        playerId,
+        options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
+      });
+
+      const result = service.handleDisconnect(socketId);
+
+      expect(result).toEqual({
+        message: 'Player disconnected',
+        socketId,
+      });
+
+      // Verify room is deleted
+      const roomAfterDisconnect = roomManager.getRoom(room.id);
+      expect(roomAfterDisconnect).toBeUndefined();
+    });
+
+    it('should remove player from room but keep room when non-owner disconnects', () => {
+      const ownerSocketId = 'owner-socket';
+      const playerSocketId = 'player-socket';
+      const ownerId = 'owner-123';
+      const playerId = 'player-123';
+
+      // Setup room with two players
+      service.handleRegisterPlayer(ownerSocketId, { playerId: ownerId });
+      const room = service.handleCreateRoom(ownerSocketId, {
+        playerId: ownerId,
+        options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
+      });
+
+      service.handleRegisterPlayer(playerSocketId, { playerId });
+      service.handleJoinRoom(playerSocketId, {
+        playerId,
+        roomId: room.id,
+      });
+
+      const result = service.handleDisconnect(playerSocketId);
+
+      expect(result).toEqual({
+        message: 'Player disconnected',
+        socketId: playerSocketId,
+      });
+
+      // Verify room still exists with only owner
+      const roomAfterDisconnect = roomManager.getRoom(room.id);
+      expect(roomAfterDisconnect).toBeDefined();
+      expect(roomAfterDisconnect?.players).toEqual([ownerId]);
     });
   });
 });

@@ -3,7 +3,8 @@ export enum ClientToServerEvents {
   JOIN_ROOM = 'joinRoom',
   LEAVE_ROOM = 'leaveRoom',
   DELETE_ROOM = 'deleteRoom',
-  PLAY_CARD = 'playCard',
+  START_GAME = 'startGame',
+  REGISTER_PLAYER = 'registerPlayer',
 }
 
 export enum ServerToClientEvents {
@@ -11,9 +12,9 @@ export enum ServerToClientEvents {
   DISCONNECTED = 'disconnected',
   ROOM_CREATED = 'roomCreated',
   ROOM_UPDATED = 'roomUpdated',
-  ROOM_CLOSED = 'roomClosed',
+  ROOM_DELETED = 'roomDeleted',
   GAME_STARTING = 'gameStarting',
   START_GAME = 'startGame',
-  CARD_PLAYED = 'cardPlayed',
+  ROOMS = 'rooms',
   ERROR = 'error',
 }

@@ -4,7 +4,7 @@ export class RoomManager {
   private readonly rooms = new Map<string, Room>();
   private readonly sockets = new Map<string, Player>();
 
-  // --- Rooms ---
+  // --- Room Repository Methods ---
   getRoom(roomId: string): Room | undefined {
     return this.rooms.get(roomId);
   }
@@ -13,62 +13,28 @@ export class RoomManager {
     return Array.from(this.rooms.values());
   }
 
-  addRoom(room: Room): void {
+  saveRoom(room: Room): void {
     this.rooms.set(room.id, room);
   }
 
-  removeRoom(roomId: string): void {
+  deleteRoom(roomId: string): void {
     this.rooms.delete(roomId);
   }
 
-  updateRoom(room: Room): void {
-    this.rooms.set(room.id, room);
-  }
-
-  // --- Players ---
+  // --- Player Repository Methods ---
   getPlayer(socketId: string): Player | undefined {
     return this.sockets.get(socketId);
   }
 
-  setPlayer(
-    socketId: string,
-    playerId: string,
-    roomId: string | null = null,
-  ): void {
-    this.sockets.set(socketId, { socketId, playerId, roomId });
+  savePlayer(player: Player): void {
+    this.sockets.set(player.socketId, player);
   }
 
-  removePlayer(socketId: string): void {
+  deletePlayer(socketId: string): void {
     this.sockets.delete(socketId);
   }
 
-  removePlayerFromRoom(roomId: string, playerId: string): void {
-    const room = this.rooms.get(roomId);
-    if (!room) return;
-    const updated: Room = {
-      ...room,
-      players: room.players.filter((p) => p !== playerId),
-    };
-    this.rooms.set(roomId, updated);
-  }
-
-  addPlayerToRoom(roomId: string, playerId: string): Room {
-    const room = this.rooms.get(roomId);
-    if (!room) throw new Error('Room not found');
-
-    const updatedRoom: Room = {
-      ...room,
-      players: [...room.players, playerId],
-    };
-    this.rooms.set(roomId, updatedRoom);
-    return updatedRoom;
-  }
-
-  shouldDeleteRoom(room: Room, playerId: string): boolean {
-    return room.owner === playerId || room.players.length === 1;
-  }
-
-  // helpers
+  // --- Helper Methods ---
   getPlayerId(socketId: string): string | undefined {
     return this.sockets.get(socketId)?.playerId;
   }

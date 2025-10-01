@@ -1,9 +1,9 @@
-import { Room } from "../types";
+import { Room } from '../types';
 
 export interface ConnectedResponse {
   message: string;
   socketId: string;
-  rooms: Room[]
+  rooms: Room[];
 }
 
 export interface DisconnectedResponse {
@@ -16,9 +16,12 @@ export interface RoomUpdatedEvent {
   players: string[];
 }
 
+export interface RoomDeletedEvent {
+  roomId: string;
+}
+
 export interface StartGameEvent {
   roomId: string;
   players: string[];
   mode: string;
 }
-

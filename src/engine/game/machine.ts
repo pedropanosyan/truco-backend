@@ -5,18 +5,19 @@ import {
   GameEvents,
   GameActions,
   GameContext,
-  GAME_RULES,
 } from './types';
 
 export const gameMachine = gameSetup.createMachine({
   id: 'game',
   initial: GameStates.IDLE,
-  context: {
-    players: [],
-    scoreLimit: GAME_RULES.DEFAULT_SCORE_LIMIT,
-    scores: {},
-    id: null,
-  } as GameContext,
+  context: ({ input }) =>
+    ({
+      players: input.players,
+      scoreLimit: input.scoreLimit,
+      scores: input.players.reduce((acc, player) => ({ ...acc, [player.id]: 0 }), {}),
+      id: input.id,
+      betAmount: input.betAmount,
+    }) as GameContext,
 
   states: {
     [GameStates.IDLE]: {
