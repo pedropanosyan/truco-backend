@@ -6,6 +6,7 @@ import { CreateRoomDto, JoinRoomDto, LeaveRoomDto } from '../dto';
 import type { Socket, Server } from 'socket.io';
 import { RoomManager } from '../utils';
 import { GameService } from 'src/game';
+import { RegisterPlayerDto } from '../dto';
 
 const createMockSocket = (id: string): Partial<Socket> => ({
   id,
@@ -56,7 +57,8 @@ describe('RoomsGateway', () => {
     // Clear service state before each test
     const roomManager = (service as any).roomManager;
     roomManager.rooms.clear();
-    roomManager.sockets.clear();
+    roomManager.players.clear();
+    roomManager.socketToPlayer.clear();
   });
 
   describe('handleConnection', () => {
@@ -66,6 +68,68 @@ describe('RoomsGateway', () => {
       expect(mockSocket.emit).toHaveBeenCalledWith(
         ServerToClientEvents.CONNECTED,
         [],
+      );
+    });
+  });
+
+  describe('handleRegisterPlayer', () => {
+    it('should register new player and emit connected event', () => {
+      const data: RegisterPlayerDto = { playerId: 'player-123' };
+
+      gateway.handleRegisterPlayer(mockSocket as Socket, data);
+
+      expect(mockSocket.emit).toHaveBeenCalledWith(
+        ServerToClientEvents.ROOMS,
+        [],
+      );
+    });
+
+    it('should reconnect player to existing room', () => {
+      const roomManager = (service as any).roomManager;
+      const roomId = 'test-room';
+
+      // Setup existing player in room
+      roomManager.rooms.set(roomId, {
+        id: roomId,
+        owner: 'player-123',
+        players: ['player-123'],
+        maxPlayers: 4,
+        betAmount: 10,
+        scoreLimit: 100,
+      });
+
+      const player = {
+        socketId: 'old-socket',
+        playerId: 'player-123',
+        roomId: roomId,
+      };
+      roomManager.players.set('player-123', player);
+      roomManager.socketToPlayer.set('old-socket', 'player-123');
+
+      const data: RegisterPlayerDto = { playerId: 'player-123' };
+
+      gateway.handleRegisterPlayer(mockSocket as Socket, data);
+
+      // Should emit room updated event
+      expect(mockServer.emit).toHaveBeenCalledWith(
+        ServerToClientEvents.ROOM_UPDATED,
+        expect.objectContaining({
+          id: roomId,
+          owner: 'player-123',
+          players: ['player-123'],
+        }),
+      );
+
+      // Should emit connected event with rooms
+      expect(mockSocket.emit).toHaveBeenCalledWith(
+        ServerToClientEvents.ROOMS,
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: roomId,
+            owner: 'player-123',
+            players: ['player-123'],
+          }),
+        ]),
       );
     });
   });
@@ -96,11 +160,13 @@ describe('RoomsGateway', () => {
       };
 
       const roomManager = (service as any).roomManager;
-      roomManager.sockets.set('test-socket-123', {
+      const player = {
         socketId: 'test-socket-123',
         playerId: 'player-123',
         roomId: null,
-      });
+      };
+      roomManager.players.set('player-123', player);
+      roomManager.socketToPlayer.set('test-socket-123', 'player-123');
 
       gateway.handleCreateRoom(mockSocket as Socket, createRoomDto);
 
@@ -131,11 +197,13 @@ describe('RoomsGateway', () => {
         scoreLimit: 100,
       });
 
-      roomManager.sockets.set('test-socket-123', {
+      const player = {
         socketId: 'test-socket-123',
         playerId: 'player-123',
         roomId: null,
-      });
+      };
+      roomManager.players.set('player-123', player);
+      roomManager.socketToPlayer.set('test-socket-123', 'player-123');
 
       const joinRoomDto: JoinRoomDto = {
         playerId: 'player-123',
@@ -172,11 +240,13 @@ describe('RoomsGateway', () => {
         scoreLimit: 100,
       });
 
-      roomManager.sockets.set('test-socket-123', {
+      const player = {
         socketId: 'test-socket-123',
         playerId: 'player-123',
         roomId: roomId,
-      });
+      };
+      roomManager.players.set('player-123', player);
+      roomManager.socketToPlayer.set('test-socket-123', 'player-123');
 
       const leaveRoomDto: LeaveRoomDto = {
         roomId: roomId,
@@ -211,11 +281,13 @@ describe('RoomsGateway', () => {
         scoreLimit: 100,
       });
 
-      roomManager.sockets.set('test-socket-123', {
+      const player = {
         socketId: 'test-socket-123',
         playerId: 'player-123',
         roomId: roomId,
-      });
+      };
+      roomManager.players.set('player-123', player);
+      roomManager.socketToPlayer.set('test-socket-123', 'player-123');
 
       const leaveRoomDto: LeaveRoomDto = {
         roomId: roomId,
@@ -251,11 +323,13 @@ describe('RoomsGateway', () => {
         scoreLimit: 100,
       });
 
-      roomManager.sockets.set('test-socket-123', {
+      const player = {
         socketId: 'test-socket-123',
         playerId: 'player-123',
         roomId: roomId,
-      });
+      };
+      roomManager.players.set('player-123', player);
+      roomManager.socketToPlayer.set('test-socket-123', 'player-123');
 
       const deleteRoomDto: LeaveRoomDto = {
         roomId: roomId,
@@ -266,7 +340,7 @@ describe('RoomsGateway', () => {
 
       expect(mockServer.emit).toHaveBeenCalledWith(
         ServerToClientEvents.ROOM_DELETED,
-        { roomId: roomId },
+        roomId,
       );
     });
 
@@ -283,11 +357,13 @@ describe('RoomsGateway', () => {
         scoreLimit: 100,
       });
 
-      roomManager.sockets.set('test-socket-123', {
+      const player = {
         socketId: 'test-socket-123',
         playerId: 'player-123',
         roomId: roomId,
-      });
+      };
+      roomManager.players.set('player-123', player);
+      roomManager.socketToPlayer.set('test-socket-123', 'player-123');
 
       const deleteRoomDto: LeaveRoomDto = {
         roomId: roomId,

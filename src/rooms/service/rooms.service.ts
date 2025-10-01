@@ -1,14 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Player, Room } from '../types';
 import {
-  ConnectedResponse,
   CreateRoomDto,
   CreateRoomResponse,
   DisconnectedResponse,
-  JoinRoomResponse,
   JoinRoomDto,
   LeaveRoomDto,
-  LeaveRoomResponse,
   DeleteRoomResponse,
   StartGameDto,
   StartGameResponse,
@@ -41,29 +38,9 @@ export class RoomsService {
     const player = this.roomManager.getPlayer(socketId);
 
     if (player) {
-      if (player.roomId) {
-        const room = this.roomManager.getRoom(player.roomId);
-        if (room) {
-          // If owner disconnects, delete the room
-          if (room.owner === player.playerId) {
-            this.roomManager.deleteRoom(room.id);
-          } else {
-            // If non-owner disconnects, remove them from room
-            const updatedRoom: Room = {
-              ...room,
-              players: room.players.filter((p) => p !== player.playerId),
-            };
-            this.roomManager.saveRoom(updatedRoom);
-          }
-        }
-
-        // Update player to remove room association
-        const updatedPlayer: Player = { ...player, roomId: null };
-        this.roomManager.savePlayer(updatedPlayer);
-      } else {
-        // Just remove the player if they're not in a room
-        this.roomManager.deletePlayer(socketId);
-      }
+      // Just remove the player from the socket mapping
+      // Keep their room association for reconnection
+      this.roomManager.disconnectPlayer(socketId);
     }
 
     return {
@@ -72,15 +49,38 @@ export class RoomsService {
     };
   }
 
-  public handleRegisterPlayer(socketId: string, data: RegisterPlayerDto): void {
+  public handleRegisterPlayer(
+    socketId: string,
+    data: RegisterPlayerDto,
+  ): { player: Player; room?: Room } {
     const { playerId } = data;
-    const player = this.roomManager.getPlayer(socketId);
-    if (player) {
-      throw new PlayerAlreadyInRoomException();
-    }
 
-    const newPlayer: Player = { socketId, playerId, roomId: null };
-    this.roomManager.savePlayer(newPlayer);
+    // Check if player already exists with a different socket ID
+    const existingPlayer = this.findPlayerByPlayerId(playerId);
+
+    if (existingPlayer) {
+      // Player exists, remove old socket mapping and add new one
+      const oldSocketId = existingPlayer.socketId;
+      if (oldSocketId !== socketId) {
+        this.roomManager.disconnectPlayer(oldSocketId);
+      }
+
+      this.roomManager.updateSocketMapping(socketId, existingPlayer.playerId);
+      const updatedPlayer: Player = { ...existingPlayer, socketId };
+      this.roomManager.savePlayer(updatedPlayer);
+
+      // Get their room if they're in one
+      const room = existingPlayer.roomId
+        ? this.roomManager.getRoom(existingPlayer.roomId)
+        : undefined;
+
+      return { player: updatedPlayer, room };
+    } else {
+      // New player, create them
+      const newPlayer: Player = { socketId, playerId, roomId: null };
+      this.roomManager.savePlayer(newPlayer);
+      return { player: newPlayer };
+    }
   }
 
   public handleCreateRoom(
@@ -118,12 +118,35 @@ export class RoomsService {
   }
 
   public handleJoinRoom(socketId: string, data: JoinRoomDto): Room {
-    // Validate player exists and is not in a room
-    const player = this.roomManager.getPlayer(socketId);
+    // Get or create player
+    let player = this.roomManager.getPlayer(socketId);
+
     if (!player || player.playerId !== data.playerId) {
-      throw new PlayerNotFoundException();
+      // Check if player exists with different socket ID (reconnection)
+      const existingPlayer = this.findPlayerByPlayerId(data.playerId);
+
+      if (existingPlayer) {
+        // Player exists, update socket mapping
+        const oldSocketId = existingPlayer.socketId;
+        if (oldSocketId !== socketId) {
+          this.roomManager.disconnectPlayer(oldSocketId);
+        }
+        this.roomManager.updateSocketMapping(socketId, existingPlayer.playerId);
+        player = { ...existingPlayer, socketId };
+        this.roomManager.savePlayer(player);
+      } else {
+        // New player, create them
+        player = { socketId, playerId: data.playerId, roomId: null };
+        this.roomManager.savePlayer(player);
+      }
     }
 
+    // If player is already in the same room, return the room (idempotent)
+    if (player.roomId === data.roomId) {
+      return this.roomManager.getRoom(data.roomId)!;
+    }
+
+    // If player is in a different room, throw error
     if (player.roomId) {
       throw new PlayerAlreadyInRoomException();
     }
@@ -199,8 +222,6 @@ export class RoomsService {
   ): DeleteRoomResponse {
     // Validate player exists and is in a room
     const player = this.roomManager.getPlayer(socketId);
-    console.log('player', player);
-    console.log('data', data);
     if (!player || player.playerId !== data.playerId) {
       throw new PlayerNotFoundException();
     }
@@ -221,12 +242,11 @@ export class RoomsService {
       );
     }
 
+    // Clear room association for all players in the room
+    this.roomManager.clearRoomForAllPlayers(room.id);
+
     // Delete the room
     this.roomManager.deleteRoom(room.id);
-
-    // Update player to remove room association
-    const updatedPlayer: Player = { ...player, roomId: null };
-    this.roomManager.savePlayer(updatedPlayer);
 
     return { roomId: room.id };
   }
@@ -265,4 +285,8 @@ export class RoomsService {
   }
 
   // --- Private Business Logic Methods ---
+
+  private findPlayerByPlayerId(playerId: string): Player | undefined {
+    return this.roomManager.findPlayerByPlayerId(playerId);
+  }
 }

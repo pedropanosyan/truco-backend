@@ -52,8 +52,13 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: RegisterPlayerDto,
   ): void {
     try {
-      this.roomsService.handleRegisterPlayer(client.id, data);
-      this.server.emit(
+      const result = this.roomsService.handleRegisterPlayer(client.id, data);
+
+      if (result.room) {
+        this.server.emit(ServerToClientEvents.ROOM_UPDATED, result.room);
+      }
+
+      client.emit(
         ServerToClientEvents.ROOMS,
         this.roomsService.handleGetAllRooms(),
       );

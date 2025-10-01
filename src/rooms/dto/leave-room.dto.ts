@@ -10,7 +10,3 @@ export class LeaveRoomDto {
   playerId: string;
 }
 
-export interface LeaveRoomResponse {
-  roomId: string;
-  players: string[];
-}

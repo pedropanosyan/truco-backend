@@ -61,7 +61,15 @@ describe('RoomsService', () => {
       const socketId = 'test-socket';
       const data: RegisterPlayerDto = { playerId: 'player-123' };
 
-      service.handleRegisterPlayer(socketId, data);
+      const result = service.handleRegisterPlayer(socketId, data);
+
+      expect(result).toEqual({
+        player: {
+          socketId,
+          playerId: 'player-123',
+          roomId: null,
+        },
+      });
 
       const player = roomManager.getPlayer(socketId);
       expect(player).toEqual({
@@ -71,17 +79,63 @@ describe('RoomsService', () => {
       });
     });
 
-    it('should throw error if player already exists', () => {
-      const socketId = 'test-socket';
-      const data: RegisterPlayerDto = { playerId: 'player-123' };
+    it('should reconnect existing player with new socket ID', () => {
+      const originalSocketId = 'original-socket';
+      const newSocketId = 'new-socket';
+      const playerId = 'player-123';
 
       // Register player first time
-      service.handleRegisterPlayer(socketId, data);
+      service.handleRegisterPlayer(originalSocketId, { playerId });
 
-      // Try to register again
-      expect(() => {
-        service.handleRegisterPlayer(socketId, data);
-      }).toThrow(PlayerAlreadyInRoomException);
+      // Register with new socket ID (simulating reconnection)
+      const result = service.handleRegisterPlayer(newSocketId, { playerId });
+
+      expect(result).toEqual({
+        player: {
+          socketId: newSocketId,
+          playerId: 'player-123',
+          roomId: null,
+        },
+      });
+
+      // Original socket should no longer exist
+      expect(roomManager.getPlayer(originalSocketId)).toBeUndefined();
+
+      // New socket should exist
+      expect(roomManager.getPlayer(newSocketId)).toEqual({
+        socketId: newSocketId,
+        playerId: 'player-123',
+        roomId: null,
+      });
+    });
+
+    it('should reconnect player to their existing room', () => {
+      const originalSocketId = 'original-socket';
+      const newSocketId = 'new-socket';
+      const playerId = 'player-123';
+
+      // Register player and create room
+      service.handleRegisterPlayer(originalSocketId, { playerId });
+      const room = service.handleCreateRoom(originalSocketId, {
+        playerId,
+        options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
+      });
+
+      // Register with new socket ID (simulating reconnection)
+      const result = service.handleRegisterPlayer(newSocketId, { playerId });
+
+      expect(result).toEqual({
+        player: {
+          socketId: newSocketId,
+          playerId: 'player-123',
+          roomId: room.id,
+        },
+        room: expect.objectContaining({
+          id: room.id,
+          owner: playerId,
+          players: [playerId],
+        }),
+      });
     });
   });
 
@@ -185,7 +239,7 @@ describe('RoomsService', () => {
       expect(player?.roomId).toBe(room.id);
     });
 
-    it('should throw error if player not found', () => {
+    it('should auto-register player and throw error if room not found', () => {
       const data: JoinRoomDto = {
         playerId: 'player-123',
         roomId: 'test-room',
@@ -193,7 +247,7 @@ describe('RoomsService', () => {
 
       expect(() => {
         service.handleJoinRoom('test-socket', data);
-      }).toThrow(PlayerNotFoundException);
+      }).toThrow(RoomNotFoundException);
     });
 
     it('should throw error if player already in room', () => {
@@ -214,6 +268,28 @@ describe('RoomsService', () => {
           roomId: 'other-room',
         });
       }).toThrow(PlayerAlreadyInRoomException);
+    });
+
+    it('should allow rejoining the same room (idempotent)', () => {
+      const socketId = 'test-socket';
+      const playerId = 'player-123';
+      const roomId = 'test-room';
+
+      // Register player and create room
+      service.handleRegisterPlayer(socketId, { playerId });
+      const room = service.handleCreateRoom(socketId, {
+        playerId,
+        options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
+      });
+
+      // Try to join the same room again (should succeed)
+      const result = service.handleJoinRoom(socketId, {
+        playerId,
+        roomId: room.id,
+      });
+
+      // Should return the same room without error
+      expect(result).toEqual(room);
     });
 
     it('should throw error if room not found', () => {
@@ -292,8 +368,9 @@ describe('RoomsService', () => {
       const result = service.handleLeaveRoom(playerSocketId, data);
 
       expect(result).toMatchObject({
-        roomId: room.id,
+        id: room.id,
         players: [ownerId],
+        owner: ownerId,
       });
 
       // Verify player is no longer in room
@@ -431,6 +508,54 @@ describe('RoomsService', () => {
         });
       }).toThrow(PlayerNotInRoomException);
     });
+
+    it('should clear roomId for all players when room is deleted', () => {
+      const ownerSocketId = 'owner-socket';
+      const player1SocketId = 'player1-socket';
+      const player2SocketId = 'player2-socket';
+      const ownerId = 'owner-123';
+      const player1Id = 'player1-123';
+      const player2Id = 'player2-123';
+
+      // Setup room with three players
+      service.handleRegisterPlayer(ownerSocketId, { playerId: ownerId });
+      const room = service.handleCreateRoom(ownerSocketId, {
+        playerId: ownerId,
+        options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
+      });
+
+      service.handleRegisterPlayer(player1SocketId, { playerId: player1Id });
+      service.handleJoinRoom(player1SocketId, {
+        playerId: player1Id,
+        roomId: room.id,
+      });
+
+      service.handleRegisterPlayer(player2SocketId, { playerId: player2Id });
+      service.handleJoinRoom(player2SocketId, {
+        playerId: player2Id,
+        roomId: room.id,
+      });
+
+      // Verify all players are in the room before deletion
+      expect(roomManager.getPlayer(ownerSocketId)?.roomId).toBe(room.id);
+      expect(roomManager.getPlayer(player1SocketId)?.roomId).toBe(room.id);
+      expect(roomManager.getPlayer(player2SocketId)?.roomId).toBe(room.id);
+
+      // Delete the room
+      const result = service.handleDeleteRoom(ownerSocketId, {
+        playerId: ownerId,
+        roomId: room.id,
+      });
+
+      // Verify room is deleted
+      expect(result).toEqual({ roomId: room.id });
+      expect(roomManager.getRoom(room.id)).toBeUndefined();
+
+      // Verify ALL players have their roomId cleared
+      expect(roomManager.getPlayer(ownerSocketId)?.roomId).toBeNull();
+      expect(roomManager.getPlayer(player1SocketId)?.roomId).toBeNull();
+      expect(roomManager.getPlayer(player2SocketId)?.roomId).toBeNull();
+    });
   });
 
   describe('handleStartGame', () => {
@@ -504,12 +629,12 @@ describe('RoomsService', () => {
         socketId,
       });
 
-      // Verify player is removed
+      // Verify player is removed from socket mapping
       const player = roomManager.getPlayer(socketId);
       expect(player).toBeUndefined();
     });
 
-    it('should remove player from room and delete room when owner disconnects', () => {
+    it('should keep room when owner disconnects (for reconnection)', () => {
       const socketId = 'test-socket';
       const playerId = 'player-123';
 
@@ -527,12 +652,13 @@ describe('RoomsService', () => {
         socketId,
       });
 
-      // Verify room is deleted
+      // Verify room still exists (for reconnection)
       const roomAfterDisconnect = roomManager.getRoom(room.id);
-      expect(roomAfterDisconnect).toBeUndefined();
+      expect(roomAfterDisconnect).toBeDefined();
+      expect(roomAfterDisconnect?.players).toEqual([playerId]);
     });
 
-    it('should remove player from room but keep room when non-owner disconnects', () => {
+    it('should keep room when non-owner disconnects (for reconnection)', () => {
       const ownerSocketId = 'owner-socket';
       const playerSocketId = 'player-socket';
       const ownerId = 'owner-123';
@@ -558,10 +684,63 @@ describe('RoomsService', () => {
         socketId: playerSocketId,
       });
 
-      // Verify room still exists with only owner
+      // Verify room still exists with both players (for reconnection)
       const roomAfterDisconnect = roomManager.getRoom(room.id);
       expect(roomAfterDisconnect).toBeDefined();
-      expect(roomAfterDisconnect?.players).toEqual([ownerId]);
+      expect(roomAfterDisconnect?.players).toEqual([ownerId, playerId]);
+    });
+  });
+
+  describe('Reconnection Scenario', () => {
+    it('should allow player to leave room after refresh (simulating the reported issue)', () => {
+      const socketId1 = 'socket-1';
+      const socketId2 = 'socket-2'; // New socket after refresh
+      const playerId = 'player-123';
+
+      // 1. Register player and create room
+      service.handleRegisterPlayer(socketId1, { playerId });
+      const room = service.handleCreateRoom(socketId1, {
+        playerId,
+        options: { maxPlayers: 4, betAmount: 10, scoreLimit: 100 },
+      });
+
+      // 2. Simulate disconnect (refresh)
+      service.handleDisconnect(socketId1);
+
+      // 3. Simulate reconnection with new socket
+      const reconnectionResult = service.handleRegisterPlayer(socketId2, {
+        playerId,
+      });
+
+      // 4. Verify player is reconnected to room
+      expect(reconnectionResult.room).toBeDefined();
+      expect(reconnectionResult.room?.id).toBe(room.id);
+      expect(reconnectionResult.player.roomId).toBe(room.id);
+
+      // 5. Try to leave room (should fail since owner can't leave)
+      expect(() => {
+        service.handleLeaveRoom(socketId2, {
+          playerId,
+          roomId: room.id,
+        });
+      }).toThrow(UnauthorizedRoomActionException);
+
+      // 6. Try to delete room (this should work)
+      const deleteResult = service.handleDeleteRoom(socketId2, {
+        playerId,
+        roomId: room.id,
+      });
+
+      // 7. Verify delete was successful
+      expect(deleteResult).toEqual({ roomId: room.id });
+
+      // 8. Verify room no longer exists
+      const roomAfterDelete = roomManager.getRoom(room.id);
+      expect(roomAfterDelete).toBeUndefined();
+
+      // 9. Verify player is no longer in room
+      const playerAfterDelete = roomManager.getPlayer(socketId2);
+      expect(playerAfterDelete?.roomId).toBeNull();
     });
   });
 });
