@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { RoomsService } from './rooms.service';
+import { LobbyService } from './rooms.service';
 import { RoomManager } from '../utils';
 import { GameService } from 'src/game';
 import {
@@ -18,15 +18,15 @@ import {
   UnauthorizedRoomActionException,
 } from '../exceptions';
 
-describe('RoomsService', () => {
-  let service: RoomsService;
+describe('LobbyService', () => {
+  let service: LobbyService;
   let roomManager: RoomManager;
   let gameService: GameService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        RoomsService,
+        LobbyService,
         RoomManager,
         {
           provide: GameService,
@@ -44,7 +44,7 @@ describe('RoomsService', () => {
       ],
     }).compile();
 
-    service = module.get<RoomsService>(RoomsService);
+    service = module.get<LobbyService>(LobbyService);
     roomManager = module.get<RoomManager>(RoomManager);
     gameService = module.get<GameService>(GameService);
   });

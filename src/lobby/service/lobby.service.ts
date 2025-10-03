@@ -24,7 +24,7 @@ import { randomUUID } from 'crypto';
 import { GameService, StartGame } from 'src/game';
 
 @Injectable()
-export class RoomsService {
+export class LobbyService {
   constructor(
     private readonly roomManager: RoomManager,
     private readonly gameService: GameService,

@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { RoomsGateway } from './rooms.gateway';
-import { RoomsService } from '../service/rooms.service';
+import { LobbyGateway } from './rooms.gateway';
+import { LobbyService } from '../service/rooms.service';
 import { ServerToClientEvents } from '../types';
 import { CreateRoomDto, JoinRoomDto, LeaveRoomDto } from '../dto';
 import type { Socket, Server } from 'socket.io';
@@ -20,17 +20,17 @@ const createMockServer = (): Partial<Server> => ({
   to: jest.fn().mockReturnThis(),
 });
 
-describe('RoomsGateway', () => {
-  let gateway: RoomsGateway;
-  let service: RoomsService;
+describe('LobbyGateway', () => {
+  let gateway: LobbyGateway;
+  let service: LobbyService;
   let mockSocket: Partial<Socket>;
   let mockServer: Partial<Server>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        RoomsGateway,
-        RoomsService,
+        LobbyGateway,
+        LobbyService,
         RoomManager,
         {
           provide: GameService,
@@ -48,8 +48,8 @@ describe('RoomsGateway', () => {
       ],
     }).compile();
 
-    gateway = module.get<RoomsGateway>(RoomsGateway);
-    service = module.get<RoomsService>(RoomsService);
+    gateway = module.get<LobbyGateway>(LobbyGateway);
+    service = module.get<LobbyService>(LobbyService);
     mockSocket = createMockSocket('test-socket-123');
     mockServer = createMockServer();
     gateway.server = mockServer as Server;
