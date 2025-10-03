@@ -1,12 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { LobbyGateway } from './rooms.gateway';
-import { LobbyService } from '../service/rooms.service';
+import { LobbyGateway } from './lobby.gateway';
+import { LobbyService } from '../service';
 import { ServerToClientEvents } from '../types';
-import { CreateRoomDto, JoinRoomDto, LeaveRoomDto } from '../dto';
+import { CreateRoomDto, JoinRoomDto, LeaveRoomDto, RegisterPlayerDto } from '../dto';
 import type { Socket, Server } from 'socket.io';
 import { RoomManager } from '../utils';
 import { GameService } from 'src/game';
-import { RegisterPlayerDto } from '../dto';
 
 const createMockSocket = (id: string): Partial<Socket> => ({
   id,

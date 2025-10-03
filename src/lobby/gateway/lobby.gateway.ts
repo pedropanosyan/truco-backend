@@ -8,7 +8,7 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
-import { LobbyService } from '../service/rooms.service';
+import { LobbyService } from '../service';
 import { ClientToServerEvents, ServerToClientEvents } from '../types';
 import {
   type JoinRoomDto,

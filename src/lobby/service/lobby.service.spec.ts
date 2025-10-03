@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { LobbyService } from './rooms.service';
+import { LobbyService } from './lobby.service';
 import { RoomManager } from '../utils';
 import { GameService } from 'src/game';
 import {

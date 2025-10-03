@@ -1,1 +1,1 @@
-export * from './rooms.gateway';
+export * from './lobby.gateway';
